@@ -43,13 +43,27 @@ public class IngredientController {
     return repo.findById(id);
   }
 
+  // @PutMapping("/{id}")
+  // public void updateIngredient(@PathVariable String id, @RequestBody Ingredient ingredient) {
+  //   if (!ingredient.getId().equals(id)) {
+  //     throw new IllegalStateException("Given ingredient's ID doesn't match the ID in the path.");
+  //   }
+  //   repo.save(ingredient);
+  // }
+
+  //TC-01 - Actualizar un ingrediente sin perder el publisher
   @PutMapping("/{id}")
-  public void updateIngredient(@PathVariable String id, @RequestBody Ingredient ingredient) {
-    if (!ingredient.getId().equals(id)) {
-      throw new IllegalStateException("Given ingredient's ID doesn't match the ID in the path.");
+  public Mono<ResponseEntity<Ingredient>> updateIngredient(@PathVariable String id, @RequestBody Ingredient ingredient) {
+    if (ingredient.getId() != null && !ingredient.getId().equals(id)) {
+      return Mono.just(ResponseEntity.badRequest().build());
     }
-    repo.save(ingredient);
+    ingredient.setId(id);
+    return repo.findById(id)
+        .flatMap(updatedIngredient -> repo.save(ingredient))
+        .map(ResponseEntity::ok)
+        .defaultIfEmpty(ResponseEntity.notFound().build());
   }
+  //TC-01 - Fin
 
   @PostMapping
   public Mono<ResponseEntity<Ingredient>> postIngredient(@RequestBody Mono<Ingredient> ingredient) {
