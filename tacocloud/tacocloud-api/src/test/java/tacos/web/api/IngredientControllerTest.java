@@ -69,4 +69,37 @@ public class IngredientControllerTest {
             .exchange()
             .expectStatus().isNotFound();
     }
+
+    @Test 
+    public void shouldReturnNoContentWhenDeletingExistingIngredient(){
+        IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
+        Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP);
+        Mono<Ingredient> ingredientMono = Mono.just(ingredient);
+        when(ingredientRepo.findById(ingredient.getId())).thenReturn(ingredientMono);
+        when(ingredientRepo.deleteById(ingredient.getId())).thenReturn(Mono.empty());
+
+        WebTestClient testClient = WebTestClient.bindToController(
+            new IngredientController(ingredientRepo)
+        ).build();
+
+        testClient.delete().uri("/api/ingredients/{id}", ingredient.getId())
+            .exchange()
+            .expectStatus().isNoContent();
+    }
+
+    @Test 
+    public void shouldReturnNotFoundWhenDeletingNonExistingIngredient(){
+        IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
+        String nonExistingId = "LALA";
+        Mono<Ingredient> emptyMono = Mono.empty();
+        when(ingredientRepo.findById(nonExistingId)).thenReturn(emptyMono);
+
+        WebTestClient testClient = WebTestClient.bindToController(
+            new IngredientController(ingredientRepo)
+        ).build();
+
+        testClient.delete().uri("/api/ingredients/{id}", nonExistingId)
+            .exchange()
+            .expectStatus().isNotFound();
+    }
 }

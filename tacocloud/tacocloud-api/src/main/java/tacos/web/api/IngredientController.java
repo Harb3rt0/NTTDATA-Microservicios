@@ -76,9 +76,21 @@ public class IngredientController {
         });
   }
 
-  @DeleteMapping("/{id}")
-  public void deleteIngredient(@PathVariable String id) {
-    repo.deleteById(id);
-  }
+  // @DeleteMapping("/{id}")
+  // public void deleteIngredient(@PathVariable String id) {
+  //   repo.deleteById(id);
+  // }
 
+  //TC-02 - Eliminar de verdad y responder con semantica HTTP
+  @DeleteMapping("/{id}")
+  public Mono<ResponseEntity<Void>> deleteIngredient(@PathVariable String id){
+    if(id == null || id.isEmpty()){
+      return Mono.just(ResponseEntity.badRequest().build());
+    }
+    return repo.findById(id)
+        .flatMap(ingredient -> repo.deleteById(ingredient.getId())
+            .then(Mono.just(ResponseEntity.noContent().<Void>build())))
+        .defaultIfEmpty(ResponseEntity.notFound().build());
+  }
+  //TC-02 - Fin
 }
