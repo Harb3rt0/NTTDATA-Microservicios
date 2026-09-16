@@ -2,10 +2,13 @@ package tacos.web.api;
 
 import java.net.URI;
 
+import javax.validation.Valid;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -65,16 +69,29 @@ public class IngredientController {
   }
   //TC-01 - Fin
 
+  // @PostMapping
+  // public Mono<ResponseEntity<Ingredient>> postIngredient(@RequestBody Mono<Ingredient> ingredient) {
+  //   return ingredient
+  //       .flatMap(repo::save)
+  //       .map(i -> {
+  //         HttpHeaders headers = new HttpHeaders();
+  //         headers.setLocation(URI.create("http://localhost:8080/ingredients/" + i.getId()));
+  //         return new ResponseEntity<Ingredient>(i, headers, HttpStatus.CREATED);
+  //       });
+  // }
+
+  //TC-03 - Construir Location sin localhost ni rutas rotas
   @PostMapping
-  public Mono<ResponseEntity<Ingredient>> postIngredient(@RequestBody Mono<Ingredient> ingredient) {
-    return ingredient
+  public Mono postIngredient(@RequestBody @Valid Ingredient ingredient, UriComponentsBuilder ucb) {
+    return Mono.just(ingredient)
         .flatMap(repo::save)
         .map(i -> {
-          HttpHeaders headers = new HttpHeaders();
-          headers.setLocation(URI.create("http://localhost:8080/ingredients/" + i.getId()));
-          return new ResponseEntity<Ingredient>(i, headers, HttpStatus.CREATED);
+          URI location = ucb.path("/{id}")
+            .buildAndExpand(i.getId()).toUri();
+          return ResponseEntity.created(location).body(i);
         });
   }
+  //TC-03 – Fin
 
   // @DeleteMapping("/{id}")
   // public void deleteIngredient(@PathVariable String id) {
