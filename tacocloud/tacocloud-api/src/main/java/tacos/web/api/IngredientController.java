@@ -27,7 +27,6 @@ import tacos.data.IngredientRepository;
 
 @RestController
 @RequestMapping(path="/api/ingredients", produces="application/json")
-@CrossOrigin(origins="http://localhost:8080")
 public class IngredientController {
 
   private IngredientRepository repo;
@@ -82,11 +81,11 @@ public class IngredientController {
 
   //TC-03 - Construir Location sin localhost ni rutas rotas
   @PostMapping
-  public Mono postIngredient(@RequestBody @Valid Ingredient ingredient, UriComponentsBuilder ucb) {
+  public Mono<ResponseEntity<Ingredient>> postIngredient(@RequestBody @Valid Ingredient ingredient, UriComponentsBuilder ucb) {
     return Mono.just(ingredient)
         .flatMap(repo::save)
         .map(i -> {
-          URI location = ucb.path("/{id}")
+          URI location = ucb.path("/api/ingredients/{id}")
             .buildAndExpand(i.getId()).toUri();
           return ResponseEntity.created(location).body(i);
         });
