@@ -16,9 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import org.springframework.web.server.ResponseStatusException;
 import tacos.TacoOrder;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.web.api.dto.OrderPatchRequest;
 
 @RestController
 @RequestMapping(path="/api/orders",
@@ -72,11 +74,13 @@ public class OrderApiController {
     return order.flatMap(repo::save);
   }
 
+  //TC-04 - PATCH de ordenes con lista blanca y sin ZIP mutante
   @PatchMapping(path="/{orderId}", consumes="application/json")
   public Mono<TacoOrder> patchOrder(@PathVariable("orderId") String orderId,
-                          @RequestBody TacoOrder patch) {
+                          @RequestBody OrderPatchRequest patch) {
 
     return repo.findById(orderId)
+        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
         .map(order -> {
           if (patch.getDeliveryName() != null) {
             order.setDeliveryName(patch.getDeliveryName());
@@ -91,21 +95,13 @@ public class OrderApiController {
             order.setDeliveryState(patch.getDeliveryState());
           }
           if (patch.getDeliveryZip() != null) {
-            order.setDeliveryZip(patch.getDeliveryState());
-          }
-          if (patch.getCcNumber() != null) {
-            order.setCcNumber(patch.getCcNumber());
-          }
-          if (patch.getCcExpiration() != null) {
-            order.setCcExpiration(patch.getCcExpiration());
-          }
-          if (patch.getCcCVV() != null) {
-            order.setCcCVV(patch.getCcCVV());
+            order.setDeliveryZip(patch.getDeliveryZip());
           }
           return order;
         })
         .flatMap(repo::save);
   }
+  //TC-04 - Fin
 
   @DeleteMapping("/{orderId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
