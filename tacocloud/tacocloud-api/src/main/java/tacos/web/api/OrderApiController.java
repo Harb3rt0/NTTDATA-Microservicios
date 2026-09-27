@@ -1,11 +1,14 @@
 package tacos.web.api;
 
-import org.springframework.dao.EmptyResultDataAccessException;
+import javax.validation.Valid;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,17 +21,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import org.springframework.web.server.ResponseStatusException;
 import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
 import tacos.api.dto.OrderResponse;
 import tacos.api.dto.OrderUpdateRequest;
+import tacos.api.error.ApiErrorCodes;
+import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
 
 @RestController
+@Validated
 @RequestMapping(path = "/api/orders", produces = "application/json")
 @CrossOrigin(origins = "http://localhost:8080")
 public class OrderApiController {
@@ -74,7 +79,7 @@ public class OrderApiController {
   //TC-08 - Separar DTOs de entrada, respuesta y persistencia
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<OrderResponse> postOrder(@RequestBody OrderCreateRequest request) {
+  public Mono<OrderResponse> postOrder(@Valid @RequestBody OrderCreateRequest request) {
     return orderService.createOrder(request)
       .map(orderMapper::toResponse);
   }
@@ -93,7 +98,7 @@ public class OrderApiController {
   @PostMapping(path = "fromEmail", consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
   //modificacion para TC-08
-  public Mono<OrderResponse> postOrderFromEmail(@RequestBody EmailOrder emailOrder) {
+  public Mono<OrderResponse> postOrderFromEmail(@Valid @RequestBody EmailOrder emailOrder) {
     //TC-07 - Una sola suscripcion para guarar y publicar
     return emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder))
       .flatMap(orderService::saveAndPublish)
@@ -104,11 +109,6 @@ public class OrderApiController {
       // );
     //TC-07 - Fin
   }
-
-  @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<String> handleValidationExceptions(IllegalArgumentException ex) {
-    return ResponseEntity.badRequest().body(ex.getMessage());
-  }
   //TC-06 - Fin
 
   /*
@@ -116,25 +116,27 @@ public class OrderApiController {
    * caso PUT
    */
   @PutMapping(path = "/{orderId}", consumes = "application/json")
-  public Mono<ResponseEntity<OrderResponse>> putOrder(@PathVariable("orderId") String orderId,
-      @RequestBody OrderUpdateRequest order) {
+  public Mono<ResponseEntity<OrderResponse>> putOrder(
+      @PathVariable("orderId") @NotBlank @Size(max = 64) String orderId,
+      @Valid @RequestBody OrderUpdateRequest order) {
     return orderService
         .updateOrder(orderId, order)
         .map(orderMapper::toResponse)
-        .map(ResponseEntity::ok)
-        .defaultIfEmpty(ResponseEntity.notFound().<OrderResponse>build());
+        .map(ResponseEntity::ok);
   }
   // TC-05 - Fin caso PUT
 
   // TC-04 - PATCH de ordenes con lista blanca y sin ZIP mutante
   @PatchMapping(path = "/{orderId}", consumes = "application/json")
   //adaptacion para TC-08
-  public Mono<OrderResponse> patchOrder(@PathVariable("orderId") String orderId,
-      @RequestBody OrderPatchRequest patch) {
+  public Mono<OrderResponse> patchOrder(
+      @PathVariable("orderId") @NotBlank @Size(max = 64) String orderId,
+      @Valid @RequestBody OrderPatchRequest patch) {
 
     //modificacion pata TC-08
     return repo.findById(orderId)
-        .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND)))
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.ORDER_NOT_FOUND, "Order was not found.")))
         .map(order -> {
             orderMapper.patchEntity(patch, order);
             return order;
@@ -149,11 +151,13 @@ public class OrderApiController {
    * caso DELETE
    */
   @DeleteMapping("/{orderId}")
-  public Mono<ResponseEntity<Void>> deleteOrder(@PathVariable("orderId") String orderId) {
+  public Mono<ResponseEntity<Void>> deleteOrder(
+      @PathVariable("orderId") @NotBlank @Size(max = 64) String orderId) {
     return repo.findById(orderId)
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.ORDER_NOT_FOUND, "Order was not found.")))
         .flatMap(order -> repo.deleteById(order.getId())
-            .then(Mono.just(ResponseEntity.noContent().<Void>build())))
-        .defaultIfEmpty(ResponseEntity.notFound().build());
+            .thenReturn(ResponseEntity.noContent().<Void>build()));
   }
   // TC-05 - Fin caso DELETE
 }

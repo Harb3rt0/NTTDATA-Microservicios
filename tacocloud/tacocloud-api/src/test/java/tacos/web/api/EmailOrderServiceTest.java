@@ -22,6 +22,8 @@ import tacos.TacoOrder;
 import tacos.PaymentMethod;
 import tacos.Taco;
 import tacos.User;
+import tacos.api.error.BusinessRuleException;
+import tacos.api.error.ApiErrorCodes;
 import tacos.data.IngredientRepository;
 import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
@@ -117,7 +119,8 @@ public class EmailOrderServiceTest {
         when(ingredientRepo.findById("INVALID")).thenReturn(Mono.empty());
         StepVerifier.create(emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder)))
             .expectErrorMatches(error ->
-                error instanceof IllegalArgumentException && error.getMessage().contains("Ingredient not found for id: INVALID")
+                error instanceof BusinessRuleException && ((BusinessRuleException) error).getCode()
+                    .equals(ApiErrorCodes.ORDER_INGREDIENT_NOT_FOUND)
             )
             .verify();
 
@@ -141,7 +144,8 @@ public class EmailOrderServiceTest {
 
         StepVerifier.create(emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder)))
             .expectErrorMatches(error ->
-                error instanceof IllegalArgumentException && error.getMessage().contains("User not found for email: unknown@gmail.com")
+                error instanceof BusinessRuleException && ((BusinessRuleException) error).getCode()
+                    .equals(ApiErrorCodes.ORDER_USER_NOT_FOUND)
             )
             .verify();
 
@@ -172,7 +176,8 @@ public class EmailOrderServiceTest {
 
         StepVerifier.create(emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder)))
             .expectErrorMatches(error ->
-                error instanceof IllegalArgumentException && error.getMessage().contains("Payment method not found for user: USER1")
+                error instanceof BusinessRuleException && ((BusinessRuleException) error).getCode()
+                    .equals(ApiErrorCodes.ORDER_PAYMENT_METHOD_NOT_FOUND)
             )
             .verify();
 

@@ -25,7 +25,15 @@ public class TacoCloudApplication {
       return new ErrorViewResolver() {
           @Override
           public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
-              return status == HttpStatus.NOT_FOUND
+              String path = request.getRequestURI();
+              boolean backendPath = path.equals("/api")
+                      || path.startsWith("/api/")
+                      || path.equals("/data-api")
+                      || path.startsWith("/data-api/")
+                      || path.equals("/actuator")
+                      || path.startsWith("/actuator/");
+
+              return status == HttpStatus.NOT_FOUND && !backendPath
                       ? new ModelAndView("index.html", Collections.<String, Object>emptyMap(), HttpStatus.OK)
                       : null;
           }

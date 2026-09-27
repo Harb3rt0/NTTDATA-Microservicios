@@ -19,6 +19,8 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.TacoOrder;
 import tacos.api.dto.OrderPatchRequest;
+import tacos.api.dto.OrderResponse;
+import tacos.api.dto.OrderUpdateRequest;
 import tacos.api.mapper.IngredientMapper;
 import tacos.api.mapper.OrderMapper;
 import tacos.api.mapper.TacoMapper;
@@ -56,12 +58,12 @@ public class OrderApiControllerTest {
             .bodyValue("{\"deliveryZip\":\"12345\", \"ccNumber\":\"9999999999999999\"}")
             .exchange()
             .expectStatus().isOk()
-            .expectBody(TacoOrder.class)
-            .value(responseOrder -> {
-                assert responseOrder.getDeliveryZip().equals("12345");
-                assert responseOrder.getDeliveryState().equals("CA");
-                assert responseOrder.getCcNumber().equals("1111222233334444");
-            });
+            .expectBody()
+            .jsonPath("$.deliveryZip").isEqualTo("12345")
+            .jsonPath("$.deliveryState").isEqualTo("CA")
+            .jsonPath("$.ccNumber").doesNotExist();
+
+        assertEquals("1111222233334444", existingOrder.getCcNumber());
     }
 
     @Test
@@ -110,16 +112,16 @@ public class OrderApiControllerTest {
         existingOrder.setDeliveryState("AG");
         existingOrder.setDeliveryZip("20000");
 
-        TacoOrder requestOrder = new TacoOrder();
-        requestOrder.setId("OTHER_ORDER");
-        requestOrder.setDeliveryName("Updated Name");
-        requestOrder.setDeliveryStreet("Updated Street");
-        requestOrder.setDeliveryCity("Updated City");
-        requestOrder.setDeliveryState("JC");
-        requestOrder.setDeliveryZip("44100");
+        TacoOrder updatedOrder = new TacoOrder();
+        updatedOrder.setId("ORDER1");
+        updatedOrder.setDeliveryName("Updated Name");
+        updatedOrder.setDeliveryStreet("Updated Street");
+        updatedOrder.setDeliveryCity("Updated City");
+        updatedOrder.setDeliveryState("JC");
+        updatedOrder.setDeliveryZip("44100");
 
-        when(orderRepo.findById("ORDER1")).thenReturn(Mono.just(existingOrder));
-        when(orderRepo.save(any(TacoOrder.class))).thenAnswer(i -> Mono.just(i.getArguments()[0]));
+        when(orderService.updateOrder(Mockito.eq("ORDER1"), any(OrderUpdateRequest.class)))
+            .thenReturn(Mono.just(updatedOrder));
 
         WebTestClient testClient = WebTestClient.bindToController(
             new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
@@ -127,19 +129,21 @@ public class OrderApiControllerTest {
 
         testClient.put().uri("/api/orders/ORDER1")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(requestOrder)
+            .bodyValue("{\"id\":\"OTHER_ORDER\",\"deliveryName\":\"Updated Name\","
+                + "\"deliveryStreet\":\"Updated Street\",\"deliveryCity\":\"Updated City\","
+                + "\"deliveryState\":\"JC\",\"deliveryZip\":\"44100\","
+                + "\"tacos\":[{\"name\":\"Test taco\",\"ingredientIds\":[\"FLTO\"]}]}")
             .exchange()
             .expectStatus().isOk()
-            .expectBody(TacoOrder.class)
+            .expectBody(OrderResponse.class)
             .value(responseOrder -> {
                 assertEquals("ORDER1", responseOrder.getId());
                 assertEquals("Updated Name", responseOrder.getDeliveryName());
                 assertEquals("44100", responseOrder.getDeliveryZip());
             });
 
-        verify(orderRepo).findById("ORDER1");
-        verify(orderRepo).save(any(TacoOrder.class));
-        verify(orderRepo, never()).findById("OTHER_ORDER");
+        verify(orderService).updateOrder(Mockito.eq("ORDER1"), any(OrderUpdateRequest.class));
+        verify(orderService, never()).updateOrder(Mockito.eq("OTHER_ORDER"), any(OrderUpdateRequest.class));
     }
     
     @Test

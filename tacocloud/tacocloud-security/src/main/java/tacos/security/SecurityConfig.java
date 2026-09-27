@@ -1,6 +1,7 @@
 package tacos.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,6 +16,8 @@ import org.springframework.security.config.annotation.web
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
 
 @SuppressWarnings("deprecation")
 @Configuration
@@ -23,6 +26,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
   
   @Autowired
   private UserDetailsService userDetailsService;
+
+  @Autowired(required = false)
+  @Qualifier("apiAuthenticationEntryPoint")
+  private AuthenticationEntryPoint apiAuthenticationEntryPoint;
+
+  @Autowired(required = false)
+  @Qualifier("apiAccessDeniedHandler")
+  private AccessDeniedHandler apiAccessDeniedHandler;
   
   @Override
   protected void configure(HttpSecurity http) throws Exception {
@@ -58,6 +69,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
           .frameOptions()
             .sameOrigin()
       ;
+
+    if (apiAuthenticationEntryPoint != null) {
+      http.exceptionHandling().authenticationEntryPoint(apiAuthenticationEntryPoint);
+    }
+    if (apiAccessDeniedHandler != null) {
+      http.exceptionHandling().accessDeniedHandler(apiAccessDeniedHandler);
+    }
   }
 
   @Bean

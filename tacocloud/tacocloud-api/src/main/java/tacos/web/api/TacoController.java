@@ -1,5 +1,7 @@
 package tacos.web.api;
 
+import javax.validation.Valid;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.Taco;
+import tacos.api.error.ApiErrorCodes;
+import tacos.api.error.ResourceNotFoundException;
 import tacos.data.TacoRepository;
 
 @RestController
@@ -32,13 +36,15 @@ public class TacoController {
 
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<Taco> postTaco(@RequestBody Taco taco) {
+  public Mono<Taco> postTaco(@Valid @RequestBody Taco taco) {
     return tacoRepo.save(taco);
   }
 
   @GetMapping("/{id}")
   public Mono<Taco> tacoById(@PathVariable("id") String id) {
-    return tacoRepo.findById(id);
+    return tacoRepo.findById(id)
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.TACO_NOT_FOUND, "Taco was not found.")));
   }
 
 }

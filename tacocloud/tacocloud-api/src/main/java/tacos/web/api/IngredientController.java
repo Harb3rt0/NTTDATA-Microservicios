@@ -3,13 +3,13 @@ package tacos.web.api;
 import java.net.URI;
 
 import javax.validation.Valid;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Size;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
-import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,10 +25,14 @@ import reactor.core.publisher.Mono;
 import tacos.Ingredient;
 import tacos.api.dto.IngredientRequest;
 import tacos.api.dto.IngredientResponse;
+import tacos.api.error.ApiErrorCodes;
+import tacos.api.error.BadRequestException;
+import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.IngredientMapper;
 import tacos.data.IngredientRepository;
 
 @RestController
+@Validated
 @RequestMapping(path="/api/ingredients", produces="application/json")
 public class IngredientController {
 
@@ -48,8 +52,11 @@ public class IngredientController {
   }
 
   @GetMapping("/{id}")
-  public Mono<Ingredient> byId(@PathVariable String id) {
-    return repo.findById(id);
+  public Mono<IngredientResponse> byId(@PathVariable @NotBlank @Size(max = 20) String id) {
+    return repo.findById(id)
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.INGREDIENT_NOT_FOUND, "Ingredient was not found.")))
+        .map(ingredientMapper::toResponse);
   }
 
   // @PutMapping("/{id}")
@@ -62,15 +69,19 @@ public class IngredientController {
 
   //TC-01 - Actualizar un ingrediente sin perder el publisher
   @PutMapping("/{id}")
-  public Mono<ResponseEntity<Ingredient>> updateIngredient(@PathVariable String id, @RequestBody Ingredient ingredient) {
-    if (ingredient.getId() != null && !ingredient.getId().equals(id)) {
-      return Mono.just(ResponseEntity.badRequest().build());
+  public Mono<ResponseEntity<Ingredient>> updateIngredient(
+      @PathVariable @NotBlank @Size(max = 20) String id,
+      @Valid @RequestBody Ingredient ingredient) {
+    if (ingredient.getId() != null && !ingredient.getId().equals(id)) { //modificacion TC-09
+      throw new BadRequestException(ApiErrorCodes.INGREDIENT_ID_MISMATCH,
+          "The ingredient id does not match the path id.");
     }
     ingredient.setId(id);
     return repo.findById(id)
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.INGREDIENT_NOT_FOUND, "Ingredient was not found.")))
         .flatMap(updatedIngredient -> repo.save(ingredient))
-        .map(ResponseEntity::ok)
-        .defaultIfEmpty(ResponseEntity.notFound().build());
+        .map(ResponseEntity::ok);
   }
   //TC-01 - Fin
 
@@ -88,7 +99,7 @@ public class IngredientController {
   //TC-03 - Construir Location sin localhost ni rutas rotas
   //modificacion para TC-08
   @PostMapping
-  public Mono<ResponseEntity<IngredientResponse>> postIngredient(@RequestBody IngredientRequest request, ServerHttpRequest httpRequest) {
+  public Mono<ResponseEntity<IngredientResponse>> postIngredient(@Valid @RequestBody IngredientRequest request, ServerHttpRequest httpRequest) {
     Ingredient ingredient = ingredientMapper.toEntity(request);
     return repo.save(ingredient).map(saved -> {
       URI location = UriComponentsBuilder.fromHttpRequest(httpRequest)
@@ -108,14 +119,13 @@ public class IngredientController {
 
   //TC-02 - Eliminar de verdad y responder con semantica HTTP
   @DeleteMapping("/{id}")
-  public Mono<ResponseEntity<Void>> deleteIngredient(@PathVariable String id){
-    if(id == null || id.isEmpty()){
-      return Mono.just(ResponseEntity.badRequest().build());
-    }
+  public Mono<ResponseEntity<Void>> deleteIngredient(
+      @PathVariable @NotBlank @Size(max = 20) String id){
     return repo.findById(id)
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.INGREDIENT_NOT_FOUND, "Ingredient was not found.")))
         .flatMap(ingredient -> repo.deleteById(ingredient.getId())
-            .then(Mono.just(ResponseEntity.noContent().<Void>build())))
-        .defaultIfEmpty(ResponseEntity.notFound().build());
+            .thenReturn(ResponseEntity.noContent().<Void>build()));
   }
   //TC-02 - Fin
 }

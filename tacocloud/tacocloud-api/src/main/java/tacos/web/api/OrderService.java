@@ -9,6 +9,9 @@ import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderUpdateRequest;
 import tacos.api.dto.TacoCreateRequest;
+import tacos.api.error.ApiErrorCodes;
+import tacos.api.error.BusinessRuleException;
+import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.OrderMapper;
 import tacos.api.mapper.TacoMapper;
 import tacos.data.IngredientRepository;
@@ -46,7 +49,9 @@ public class OrderService {
     private Mono<Taco> resolveTaco(TacoCreateRequest request) {
         return Flux.fromIterable(request.getIngredientIds())
             .concatMap(ingredientId -> ingredientRepo.findById(ingredientId)
-                .switchIfEmpty(Mono.error(new IllegalArgumentException("Ingredient not found for id: " + ingredientId)))
+                .switchIfEmpty(Mono.error(new BusinessRuleException(
+                    ApiErrorCodes.ORDER_INGREDIENT_NOT_FOUND,
+                    "Ingredient '" + ingredientId + "' is not available.")))
             )
             .collectList()
             .map(ingredients -> tacoMapper.toEntity(request, ingredients));
@@ -61,7 +66,10 @@ public class OrderService {
     }
 
     public Mono<TacoOrder> updateOrder(String orderId, OrderUpdateRequest request) {
-        return repo.findById(orderId).flatMap(existingOrder ->
+        return repo.findById(orderId)
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.ORDER_NOT_FOUND, "Order was not found.")))
+        .flatMap(existingOrder ->
             Flux.fromIterable(request.getTacos()).concatMap(this::resolveTaco)
                 .collectList()
                 .map(tacos -> { orderMapper.updateEntity(request, existingOrder, tacos);

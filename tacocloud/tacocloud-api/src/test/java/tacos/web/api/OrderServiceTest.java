@@ -1,6 +1,7 @@
 package tacos.web.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -10,9 +11,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.util.Collections;
+
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.TacoOrder;
+import tacos.api.dto.OrderCreateRequest;
+import tacos.api.dto.TacoCreateRequest;
+import tacos.api.error.ApiErrorCodes;
+import tacos.api.error.BusinessRuleException;
 import tacos.api.mapper.IngredientMapper;
 import tacos.api.mapper.OrderMapper;
 import tacos.api.mapper.TacoMapper;
@@ -72,6 +79,27 @@ public class OrderServiceTest {
 
         verify(orderRepo, times(1)).save(order);
         verify(orderMessages, never()).sendOrder(order);
+    }
+
+    @Test
+    public void shouldRejectUnknownIngredientBeforeSaveOrPublish() {
+        TacoCreateRequest taco = new TacoCreateRequest();
+        taco.setName("Test taco");
+        taco.setIngredientIds(Collections.singletonList("MISSING"));
+
+        OrderCreateRequest request = new OrderCreateRequest();
+        request.setTacos(Collections.singletonList(taco));
+
+        when(ingredientRepo.findById("MISSING")).thenReturn(Mono.empty());
+
+        StepVerifier.create(orderService.createOrder(request))
+            .expectErrorMatches(error -> error instanceof BusinessRuleException
+                && ((BusinessRuleException) error).getCode()
+                    .equals(ApiErrorCodes.ORDER_INGREDIENT_NOT_FOUND))
+            .verify();
+
+        verify(orderRepo, never()).save(any(TacoOrder.class));
+        verify(orderMessages, never()).sendOrder(any(TacoOrder.class));
     }
     //final de pruebas TC-07
 }
