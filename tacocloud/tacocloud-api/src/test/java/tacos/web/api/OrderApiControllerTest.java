@@ -18,9 +18,12 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.TacoOrder;
+import tacos.api.dto.OrderPatchRequest;
+import tacos.api.mapper.IngredientMapper;
+import tacos.api.mapper.OrderMapper;
+import tacos.api.mapper.TacoMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
-import tacos.web.api.dto.OrderPatchRequest;
 
 public class OrderApiControllerTest {
 
@@ -31,6 +34,9 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);   //cambio en TC-07
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
         
         TacoOrder existingOrder = new TacoOrder();
         existingOrder.setId("ORDER1");
@@ -42,7 +48,7 @@ public class OrderApiControllerTest {
         when(orderRepo.save(any(TacoOrder.class))).thenAnswer(i -> Mono.just(i.getArguments()[0]));
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService)
+            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
         ).build();
 
         testClient.patch().uri("/api/orders/ORDER1")
@@ -64,11 +70,14 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);   //cambio en TC-07
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
         when(orderRepo.findById("NON_EXISTING")).thenReturn(Mono.empty());
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService)
+            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
         ).build();
 
         OrderPatchRequest patchRequest = new OrderPatchRequest();
@@ -89,6 +98,10 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);   //cambio en TC-07
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
+
         TacoOrder existingOrder = new TacoOrder();
         existingOrder.setId("ORDER1");
         existingOrder.setDeliveryName("Original Name");
@@ -109,7 +122,7 @@ public class OrderApiControllerTest {
         when(orderRepo.save(any(TacoOrder.class))).thenAnswer(i -> Mono.just(i.getArguments()[0]));
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService)
+            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
         ).build();
 
         testClient.put().uri("/api/orders/ORDER1")
@@ -135,6 +148,9 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);   //cambio en TC-07
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
         TacoOrder existingOrder = new TacoOrder();
         existingOrder.setId("ORDER1");
@@ -143,7 +159,7 @@ public class OrderApiControllerTest {
         when(orderRepo.deleteById("ORDER1")).thenReturn(Mono.empty());
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService)
+            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
         ).build();
 
         testClient.delete().uri("/api/orders/ORDER1")
@@ -162,11 +178,14 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);   //cambio en TC-07
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
         when(orderRepo.findById("NON_EXISTING")).thenReturn(Mono.empty());
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService)
+            new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
         ).build();
 
         testClient.delete().uri("/api/orders/NON_EXISTING")
@@ -185,6 +204,9 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
         EmailOrder emailOrder = new EmailOrder();
         emailOrder.setEmail("invalid@gmail.com");
@@ -192,7 +214,7 @@ public class OrderApiControllerTest {
         when(emailOrderService.convertEmailOrderToDomainOrder(any()))
             .thenReturn(Mono.error(new IllegalArgumentException("User not found")));
 
-        OrderApiController controller = new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService);
+        OrderApiController controller = new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper);
 
         StepVerifier.create(controller.postOrderFromEmail(emailOrder))
             .expectErrorMatches(error ->
@@ -210,6 +232,9 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
         EmailOrder emailOrder = new EmailOrder();
         emailOrder.setEmail("test.taco@gmail.com");
@@ -221,13 +246,7 @@ public class OrderApiControllerTest {
         when(emailOrderService.convertEmailOrderToDomainOrder(any())).thenReturn(Mono.just(convertedOrder));
         when(orderService.saveAndPublish(convertedOrder)).thenReturn(Mono.just(convertedOrder));
 
-        OrderApiController controller =
-            new OrderApiController(
-                orderRepo,
-                orderMessages,
-                emailOrderService,
-                orderService
-            );
+        OrderApiController controller = new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper);
 
         StepVerifier.create(controller.postOrderFromEmail(emailOrder))
             .assertNext(order -> {
@@ -245,6 +264,9 @@ public class OrderApiControllerTest {
         OrderMessagingService orderMessages = Mockito.mock(OrderMessagingService.class);
         EmailOrderService emailOrderService = Mockito.mock(EmailOrderService.class);
         OrderService orderService = Mockito.mock(OrderService.class);
+        IngredientMapper ingredientMapper = new IngredientMapper(); //cambio en TC-08
+        TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
+        OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
         AtomicInteger subscriptions = new AtomicInteger(0);
         
@@ -252,24 +274,23 @@ public class OrderApiControllerTest {
         TacoOrder convertedOrder = new TacoOrder();
 
         convertedOrder.setId("ORDER1");
+        convertedOrder.setDeliveryName("Test User");
 
         Mono<TacoOrder> coldPublisher = Mono.defer(() -> {
-                subscriptions.incrementAndGet();
-                return Mono.just(convertedOrder);
-            });
+            subscriptions.incrementAndGet();
+            return Mono.just(convertedOrder);
+        });
 
         when(emailOrderService.convertEmailOrderToDomainOrder(any())).thenReturn(coldPublisher);
         when(orderService.saveAndPublish(convertedOrder)).thenReturn(Mono.just(convertedOrder));
 
-        OrderApiController controller =
-            new OrderApiController(
-                orderRepo,
-                orderMessages,
-                emailOrderService,
-                orderService
-            );
+        OrderApiController controller = new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper);
 
-        StepVerifier.create(controller.postOrderFromEmail(emailOrder)).expectNext(convertedOrder).verifyComplete();
+        StepVerifier.create(controller.postOrderFromEmail(emailOrder)).assertNext(response -> {
+                assertEquals("ORDER1", response.getId());
+                assertEquals("Test User", response.getDeliveryName());
+            }
+        ).verifyComplete();
 
         assertEquals(1, subscriptions.get());
     }

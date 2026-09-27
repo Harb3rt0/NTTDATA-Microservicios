@@ -1,4 +1,4 @@
-package tacos.web.api.dto;
+package tacos.api.dto;
 
 import lombok.Data;
 

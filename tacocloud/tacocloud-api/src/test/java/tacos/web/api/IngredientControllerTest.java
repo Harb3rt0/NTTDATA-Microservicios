@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.Ingredient;
+import tacos.api.mapper.IngredientMapper;
 import tacos.data.IngredientRepository;
 
 public class IngredientControllerTest {
@@ -28,11 +29,12 @@ public class IngredientControllerTest {
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP);
         Ingredient ingredientUpdated = new Ingredient("FLTO", "Flour Tortilla Updated", Ingredient.Type.WRAP);
+        IngredientMapper ingredientMapper = new IngredientMapper();
         
         when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(ingredient));
         when(ingredientRepo.save(ingredientUpdated)).thenReturn(Mono.just(ingredientUpdated));
         
-        IngredientController controller = new IngredientController(ingredientRepo);
+        IngredientController controller = new IngredientController(ingredientRepo, ingredientMapper);
         
         Mono<ResponseEntity<Ingredient>> result = controller.updateIngredient("FLTO", ingredientUpdated);
         
@@ -50,13 +52,15 @@ public class IngredientControllerTest {
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP);
         Ingredient ingredientUpdated = new Ingredient("FLTO", "Flour Tortilla Updated", Ingredient.Type.WRAP);
+        IngredientMapper ingredientMapper = new IngredientMapper();
+
         Mono<Ingredient> ingredientMono = Mono.just(ingredient);
         Mono<Ingredient> ingredientUpdatedMono = Mono.just(ingredientUpdated);
         when(ingredientRepo.findById(ingredient.getId())).thenReturn(ingredientMono);
         when(ingredientRepo.save(ingredientUpdated)).thenReturn(ingredientUpdatedMono);
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         testClient.put().uri("/api/ingredients/{id}", ingredient.getId())
@@ -73,9 +77,10 @@ public class IngredientControllerTest {
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP);
         Ingredient ingredientUpdated = new Ingredient("WRAP", "Flour Tortilla Updated", Ingredient.Type.WRAP);
+        IngredientMapper ingredientMapper = new IngredientMapper();
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         testClient.put().uri("/api/ingredients/{id}", ingredient.getId())
@@ -89,11 +94,13 @@ public class IngredientControllerTest {
     public void shouldReturnNotFoundWhenUpdatingNonExistingIngredient() {
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient ingredientUpdated = new Ingredient("FLTO", "Flour Tortilla Updated", Ingredient.Type.WRAP);
+        IngredientMapper ingredientMapper = new IngredientMapper();
+
         Mono<Ingredient> emptyMono = Mono.empty();
         when(ingredientRepo.findById(ingredientUpdated.getId())).thenReturn(emptyMono);
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         testClient.put().uri("/api/ingredients/{id}", ingredientUpdated.getId())
@@ -109,11 +116,12 @@ public class IngredientControllerTest {
     public void shouldDeleteIngredientWithStepVerifier() {
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP);
+        IngredientMapper ingredientMapper = new IngredientMapper();
         
         when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(ingredient));
         when(ingredientRepo.deleteById("FLTO")).thenReturn(Mono.empty());
         
-        IngredientController controller = new IngredientController(ingredientRepo);
+        IngredientController controller = new IngredientController(ingredientRepo, ingredientMapper);
         
         Mono<ResponseEntity<Void>> result = controller.deleteIngredient("FLTO");
         
@@ -128,12 +136,14 @@ public class IngredientControllerTest {
     public void shouldReturnNoContentWhenDeletingExistingIngredient(){
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP);
+        IngredientMapper ingredientMapper = new IngredientMapper();
+
         Mono<Ingredient> ingredientMono = Mono.just(ingredient);
         when(ingredientRepo.findById(ingredient.getId())).thenReturn(ingredientMono);
         when(ingredientRepo.deleteById(ingredient.getId())).thenReturn(Mono.empty());
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         testClient.delete().uri("/api/ingredients/{id}", ingredient.getId())
@@ -144,12 +154,14 @@ public class IngredientControllerTest {
     @Test 
     public void shouldReturnNotFoundWhenDeletingNonExistingIngredient(){
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
+        IngredientMapper ingredientMapper = new IngredientMapper();
+
         String nonExistingId = "LALA";
         Mono<Ingredient> emptyMono = Mono.empty();
         when(ingredientRepo.findById(nonExistingId)).thenReturn(emptyMono);
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         testClient.delete().uri("/api/ingredients/{id}", nonExistingId)
@@ -162,12 +174,14 @@ public class IngredientControllerTest {
     @Test 
     public void shouldInspectLocationHeaderWhenCreatingIngredient(){
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
+        IngredientMapper ingredientMapper = new IngredientMapper();
+
         Ingredient ingredient = new Ingredient("ONIO", "Onion", Ingredient.Type.VEGGIES);
         Mono<Ingredient> ingredientMono = Mono.just(ingredient);
         when(ingredientRepo.save(any(Ingredient.class))).thenReturn(ingredientMono);
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         testClient.post().uri("/api/ingredients")
@@ -182,12 +196,14 @@ public class IngredientControllerTest {
     public void shouldFollowLocationHeaderAndReturn200OnIngredientCreation(){
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient ingredient = new Ingredient("ONIO", "Onion", Ingredient.Type.VEGGIES);
+        IngredientMapper ingredientMapper = new IngredientMapper();
+
         Mono<Ingredient> ingredientMono = Mono.just(ingredient);
         when(ingredientRepo.save(any(Ingredient.class))).thenReturn(ingredientMono);
         when(ingredientRepo.findById(ingredient.getId())).thenReturn(ingredientMono);
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         URI location = testClient.post().uri("/api/ingredients")
@@ -208,9 +224,10 @@ public class IngredientControllerTest {
     public void shouldReturnBadRequestWhenCreatingIngredientWithInvalidData(){
         IngredientRepository ingredientRepo = Mockito.mock(IngredientRepository.class);
         Ingredient invalidIngredient = new Ingredient("", "", null);
+        IngredientMapper ingredientMapper = new IngredientMapper();
 
         WebTestClient testClient = WebTestClient.bindToController(
-            new IngredientController(ingredientRepo)
+            new IngredientController(ingredientRepo, ingredientMapper)
         ).build();
 
         testClient.post().uri("/api/ingredients")

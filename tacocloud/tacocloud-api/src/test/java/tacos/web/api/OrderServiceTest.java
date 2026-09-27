@@ -13,19 +13,32 @@ import org.mockito.Mockito;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 import tacos.TacoOrder;
+import tacos.api.mapper.IngredientMapper;
+import tacos.api.mapper.OrderMapper;
+import tacos.api.mapper.TacoMapper;
+import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
 
 public class OrderServiceTest {
     private OrderRepository orderRepo;
+    private IngredientRepository ingredientRepo;
     private OrderMessagingService orderMessages;
+    private IngredientMapper ingredientMapper;
+    private TacoMapper tacoMapper;
+    private OrderMapper orderMapper;
     private OrderService orderService;
 
     @BeforeEach
     public void setUp() {
         orderRepo = Mockito.mock(OrderRepository.class);
+        ingredientRepo = Mockito.mock(IngredientRepository.class);
         orderMessages = Mockito.mock(OrderMessagingService.class);
-        orderService = new OrderService(orderRepo, orderMessages);
+        ingredientMapper = new IngredientMapper();
+        tacoMapper = new TacoMapper(ingredientMapper);
+        orderMapper = new OrderMapper(tacoMapper);
+        
+        orderService = new OrderService(orderRepo, ingredientRepo, orderMessages, tacoMapper, orderMapper);
     }
 
     //pruebas TC-07

@@ -23,22 +23,28 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.Ingredient;
+import tacos.api.dto.IngredientRequest;
+import tacos.api.dto.IngredientResponse;
+import tacos.api.mapper.IngredientMapper;
 import tacos.data.IngredientRepository;
 
 @RestController
 @RequestMapping(path="/api/ingredients", produces="application/json")
 public class IngredientController {
 
+  private final IngredientMapper ingredientMapper;
   private IngredientRepository repo;
 
   @Autowired
-  public IngredientController(IngredientRepository repo) {
+  public IngredientController(IngredientRepository repo, IngredientMapper ingredientMapper) {
     this.repo = repo;
+    this.ingredientMapper = ingredientMapper;
   }
 
+  //TC-08
   @GetMapping
-  public Flux<Ingredient> allIngredients() {
-    return repo.findAll();
+  public Flux<IngredientResponse> allIngredients() {
+    return repo.findAll().map(ingredientMapper::toResponse);
   }
 
   @GetMapping("/{id}")
@@ -80,15 +86,18 @@ public class IngredientController {
   // }
 
   //TC-03 - Construir Location sin localhost ni rutas rotas
+  //modificacion para TC-08
   @PostMapping
-  public Mono<ResponseEntity<Ingredient>> postIngredient(@RequestBody @Valid Ingredient ingredient, UriComponentsBuilder ucb) {
-    return Mono.just(ingredient)
-        .flatMap(repo::save)
-        .map(i -> {
-          URI location = ucb.path("/api/ingredients/{id}")
-            .buildAndExpand(i.getId()).toUri();
-          return ResponseEntity.created(location).body(i);
-        });
+  public Mono<ResponseEntity<IngredientResponse>> postIngredient(@RequestBody IngredientRequest request, ServerHttpRequest httpRequest) {
+    Ingredient ingredient = ingredientMapper.toEntity(request);
+    return repo.save(ingredient).map(saved -> {
+      URI location = UriComponentsBuilder.fromHttpRequest(httpRequest)
+        .path("/{id}")
+        .buildAndExpand(saved.getId()).toUri();
+      
+      return ResponseEntity.created(location)
+        .body(ingredientMapper.toResponse(saved));
+    });
   }
   //TC-03 – Fin
 
