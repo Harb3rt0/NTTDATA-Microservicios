@@ -32,13 +32,16 @@ public class OrderApiController {
   private OrderRepository repo;
   private OrderMessagingService orderMessages;
   private EmailOrderService emailOrderService;
+  private OrderService orderService;
 
   public OrderApiController(OrderRepository repo,
       OrderMessagingService orderMessages,
-      EmailOrderService emailOrderService) {
+      EmailOrderService emailOrderService,
+      OrderService orderService) {
     this.repo = repo;
     this.orderMessages = orderMessages;
     this.emailOrderService = emailOrderService;
+    this.orderService = orderService;
   }
 
   @GetMapping(produces = "application/json")
@@ -75,12 +78,14 @@ public class OrderApiController {
   @PostMapping(path = "fromEmail", consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
   public Mono<TacoOrder> postOrderFromEmail(@RequestBody EmailOrder emailOrder) {
+    //TC-07 - Una sola suscripcion para guarar y publicar
     return emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder))
-      .flatMap(repo::save)
-      .flatMap(savedOrder ->
-        Mono.fromRunnable(() -> orderMessages.sendOrder(savedOrder))
-        .thenReturn(savedOrder)
-      );
+      .flatMap(orderService::saveAndPublish);
+      // .flatMap(savedOrder ->
+      //   Mono.fromRunnable(() -> orderMessages.sendOrder(savedOrder))
+      //   .thenReturn(savedOrder)
+      // );
+    //TC-07 - Fin
   }
 
   @ExceptionHandler(IllegalArgumentException.class)
