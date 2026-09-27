@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -61,14 +62,32 @@ public class OrderApiController {
     return repo.save(order);
   }
 
+  // @PostMapping(path = "fromEmail", consumes = "application/json")
+  // @ResponseStatus(HttpStatus.CREATED)
+  // public Mono<TacoOrder> postOrderFromEmail(@RequestBody Mono<EmailOrder> emailOrder) {
+  //   Mono<TacoOrder> order = emailOrderService.convertEmailOrderToDomainOrder(emailOrder);
+  //   order.subscribe(orderMessages::sendOrder); // TODO: not ideal...work into reactive flow below
+  //   return order
+  //       .flatMap(repo::save);
+  // }
+
+  //TC-06 - Convertir ordenes de correo sin carreras ni nulls sorpresa
   @PostMapping(path = "fromEmail", consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<TacoOrder> postOrderFromEmail(@RequestBody Mono<EmailOrder> emailOrder) {
-    Mono<TacoOrder> order = emailOrderService.convertEmailOrderToDomainOrder(emailOrder);
-    order.subscribe(orderMessages::sendOrder); // TODO: not ideal...work into reactive flow below
-    return order
-        .flatMap(repo::save);
+  public Mono<TacoOrder> postOrderFromEmail(@RequestBody EmailOrder emailOrder) {
+    return emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder))
+      .flatMap(repo::save)
+      .flatMap(savedOrder ->
+        Mono.fromRunnable(() -> orderMessages.sendOrder(savedOrder))
+        .thenReturn(savedOrder)
+      );
   }
+
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<String> handleValidationExceptions(IllegalArgumentException ex) {
+    return ResponseEntity.badRequest().body(ex.getMessage());
+  }
+  //TC-06 - Fin
 
   /*
    * TC-05 - PUT y DELETE de ordenes con identidad consistente
