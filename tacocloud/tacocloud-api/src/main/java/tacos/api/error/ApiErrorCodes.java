@@ -1,5 +1,7 @@
 package tacos.api.error;
 
+import tacos.security.RegistrationErrorCodes;
+
 public final class ApiErrorCodes {
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String INVALID_JSON = "INVALID_JSON";
@@ -16,6 +18,10 @@ public final class ApiErrorCodes {
     public static final String EMAIL_TACOS_REQUIRED = "EMAIL_TACOS_REQUIRED";
     public static final String EMAIL_TACO_INGREDIENTS_REQUIRED = "EMAIL_TACO_INGREDIENTS_REQUIRED";
     public static final String DUPLICATE_RESOURCE = "DUPLICATE_RESOURCE";
+    //TC-10 - Códigos estables para conflictos conocidos de registro
+    public static final String USERNAME_ALREADY_EXISTS = RegistrationErrorCodes.USERNAME_ALREADY_EXISTS;
+    public static final String EMAIL_ALREADY_EXISTS = RegistrationErrorCodes.EMAIL_ALREADY_EXISTS;
+    //Fin TC-10
     public static final String OPTIMISTIC_LOCK_CONFLICT = "OPTIMISTIC_LOCK_CONFLICT";
     public static final String ACCESS_DENIED = "ACCESS_DENIED";
     public static final String AUTHENTICATION_REQUIRED = "AUTHENTICATION_REQUIRED";

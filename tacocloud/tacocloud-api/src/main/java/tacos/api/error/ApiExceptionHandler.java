@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
+import tacos.security.UserAlreadyExistsException;
+
 @RestControllerAdvice
 public class ApiExceptionHandler {
     public static final MediaType PROBLEM_JSON = MediaType.valueOf("application/problem+json");
@@ -109,6 +111,13 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DuplicateKeyException.class)
     public ResponseEntity<ApiProblem> handleDuplicateKey(DuplicateKeyException ex,
             HttpServletRequest request) {
+        //modificacion para TC-10
+        if (ex instanceof UserAlreadyExistsException) {
+            UserAlreadyExistsException userConflict = (UserAlreadyExistsException) ex;
+            return problem(HttpStatus.CONFLICT, "urn:tacocloud:problem:conflict", "Conflict",
+                userConflict.getMessage(), userConflict.getCode(), request, Collections.emptyList());
+        }
+
         return problem(HttpStatus.CONFLICT, "urn:tacocloud:problem:conflict", "Conflict",
             "A resource with the same unique value already exists.", ApiErrorCodes.DUPLICATE_RESOURCE,
             request, Collections.emptyList());

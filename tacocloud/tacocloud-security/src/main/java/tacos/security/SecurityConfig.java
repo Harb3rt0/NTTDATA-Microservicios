@@ -14,8 +14,8 @@ import org.springframework.security.config.annotation.web
 import org.springframework.security.config.annotation.web
                         .configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
@@ -61,7 +61,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
           
       .and()
         .csrf()
-          .ignoringAntMatchers("/h2-console/**", "/api/**")
+          .ignoringAntMatchers("/h2-console/**", "/api/**", "/register") //modificacion para TC-10
 
       // Allow pages to be loaded in frames from the same origin; needed for H2-Console
       .and()  
@@ -79,9 +79,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
   }
 
   @Bean
-  public PasswordEncoder encoder() {
-//    return new StandardPasswordEncoder("53cr3t");
-    return NoOpPasswordEncoder.getInstance();
+  public PasswordEncoder encoder() { //modificacion para TC-10
+    return PasswordEncoderFactories.createDelegatingPasswordEncoder();
   }
   
   
