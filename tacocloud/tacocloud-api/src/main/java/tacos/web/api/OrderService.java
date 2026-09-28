@@ -16,10 +16,12 @@ import tacos.api.dto.TacoCreateRequest;
 import tacos.api.error.ApiErrorCodes;
 import tacos.api.error.BusinessRuleException;
 import tacos.api.error.ResourceNotFoundException;
+import tacos.api.mapper.KitchenOrderEventMapper;
 import tacos.api.mapper.OrderMapper;
 import tacos.api.mapper.TacoMapper;
 import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
+import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
 
@@ -31,22 +33,27 @@ public class OrderService {
     private final TacoMapper tacoMapper;
     private final OrderMapper orderMapper;
     private final UserRepository userRepo;
+    private final PaymentMethodRepository paymentMethodRepo;
+    private final KitchenOrderEventMapper kitchenOrderEventMapper;
 
     //modificacion para TC-08
-    public OrderService(OrderRepository repo, IngredientRepository ingredientRepo, OrderMessagingService orderMessages, TacoMapper tacoMapper, OrderMapper orderMapper, UserRepository userRepo) {
+    public OrderService(OrderRepository repo, IngredientRepository ingredientRepo, OrderMessagingService orderMessages, TacoMapper tacoMapper, OrderMapper orderMapper, UserRepository userRepo, PaymentMethodRepository paymentMethodRepo, KitchenOrderEventMapper kitchenOrderEventMapper) {
         this.repo = repo;
         this.ingredientRepo = ingredientRepo;
         this.orderMessages = orderMessages;
         this.tacoMapper = tacoMapper;
         this.orderMapper = orderMapper;
         this.userRepo = userRepo; //modificacion para TC-11
+        this.paymentMethodRepo = paymentMethodRepo; //modificacion para TC-12
+        this.kitchenOrderEventMapper = kitchenOrderEventMapper; //modificacion para TC-12
     }
 
     //TC-07 - Una sola suscripcion para guarar y publicar
     public Mono<TacoOrder> saveAndPublish(TacoOrder order) {
         return repo.save(order)
             .flatMap(savedOrder ->
-                Mono.fromRunnable(() -> orderMessages.sendOrder(savedOrder))
+                Mono.fromRunnable(() -> orderMessages.sendOrder(
+                    kitchenOrderEventMapper.toEvent(savedOrder))) //modificacion para TC-12
                 .thenReturn(savedOrder)
             );
     }
@@ -67,14 +74,16 @@ public class OrderService {
     public Mono<TacoOrder> createOrder(OrderCreateRequest request, Authentication authentication) {
         //modificacion para TC-11
         return authenticatedUser(authentication)
-            .flatMap(user -> Flux.fromIterable(request.getTacos())
-                .concatMap(this::resolveTaco)
-                .collectList()
-                .map(tacos -> {
-                    TacoOrder order = orderMapper.toEntity(request, tacos);
-                    order.setUser(user);
-                    return order;
-                }))
+            .flatMap(user -> ownedPaymentMethod(request.getPaymentMethodId(), user) //modificacion para TC-12
+                .flatMap(paymentMethod -> Flux.fromIterable(request.getTacos())
+                    .concatMap(this::resolveTaco)
+                    .collectList()
+                    .map(tacos -> {
+                        TacoOrder order = orderMapper.toEntity(request, tacos);
+                        order.setUser(user);
+                        order.setPaymentMethodId(paymentMethod.getId());
+                        return order;
+                    })))
             .flatMap(this::saveAndPublish);
     }
 
@@ -131,6 +140,22 @@ public class OrderService {
             .switchIfEmpty(Mono.error(new AccessDeniedException("Authenticated user is unavailable.")));
     }
     //Fin TC-11
+
+    //TC-12 - Valida que el metodo de pago exista y pertenezca al usuario autenticado
+    private Mono<tacos.PaymentMethod> ownedPaymentMethod(String paymentMethodId, User user) {
+        return paymentMethodRepo.findById(paymentMethodId)
+            .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+                ApiErrorCodes.PAYMENT_METHOD_NOT_FOUND, "Payment method was not found.")))
+            .flatMap(paymentMethod -> {
+                if (paymentMethod.getUser() != null
+                        && user.getUsername().equals(paymentMethod.getUser().getUsername())) {
+                    return Mono.just(paymentMethod);
+                }
+                return Mono.error(new AccessDeniedException(
+                    "The payment method belongs to another user."));
+            });
+    }
+    //Fin TC-12
 
     //TC-11 - Autoriza una orden usando su propietario persistido
     private Mono<TacoOrder> accessibleOrder(String orderId, Authentication authentication) {

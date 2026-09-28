@@ -74,9 +74,7 @@ public class EmailOrderService {
             .map(tacos -> {
               TacoOrder order = new TacoOrder();
               order.setUser(user);
-              order.setCcNumber(paymentMethod.getCcNumber());
-              order.setCcCVV(paymentMethod.getCcCVV());
-              order.setCcExpiration(paymentMethod.getCcExpiration());
+              order.setPaymentMethodId(paymentMethod.getId()); //modificacion para TC-12
               order.setDeliveryName(user.getFullname());
               order.setDeliveryStreet(user.getStreet());
               order.setDeliveryCity(user.getCity());

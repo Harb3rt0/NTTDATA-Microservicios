@@ -183,9 +183,9 @@ public class DesignAndOrderTacosBrowserTest {
     fillField("input#deliveryCity", "Foodsville");
     fillField("input#deliveryState", "CO");
     fillField("input#deliveryZip", "81019");
-    fillField("input#ccNumber", "4111111111111111");
-    fillField("input#ccExpiration", "10/24");
-    fillField("input#ccCVV", "123");
+    fillField("input#cardNumber", "9999999999999999"); //modificacion para TC-12
+    fillField("input#expiration", "12/39");
+    fillField("input#cvv", "999");
     browser.findElementByCssSelector("form#orderForm").submit();
   }
 
@@ -231,9 +231,9 @@ public class DesignAndOrderTacosBrowserTest {
     fillField("input#deliveryCity", "F");
     fillField("input#deliveryState", "C");
     fillField("input#deliveryZip", "8");
-    fillField("input#ccNumber", "1234432112344322");
-    fillField("input#ccExpiration", "14/91");
-    fillField("input#ccCVV", "1234");
+    fillField("input#cardNumber", "INVALID_LAB_VALUE"); //modificacion para TC-12
+    fillField("input#expiration", "99/99");
+    fillField("input#cvv", "X");
     browser.findElementByCssSelector("form#orderForm").submit();
 
     assertThat(browser.getCurrentUrl()).isEqualTo(orderDetailsPageUrl());

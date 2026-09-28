@@ -34,6 +34,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
+import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
 
 @SpringBootTest(properties = {
@@ -41,7 +42,7 @@ import tacos.data.UserRepository;
     "tacocloud.security.allowed-origin=http://localhost:4200"
 })
 @AutoConfigureMockMvc
-@ActiveProfiles("prod")
+@ActiveProfiles({"prod", "tc12-migration"}) //modificacion para TC-12
 public class Tc11AuthorizationIntegrationTest {
 
   @Autowired
@@ -56,9 +57,12 @@ public class Tc11AuthorizationIntegrationTest {
   @MockBean
   private OrderRepository orderRepo;
 
+  @MockBean
+  private PaymentMethodRepository paymentMethodRepo; //modificacion para TC-12
+
   @BeforeEach
   public void setUp() {
-    reset(ingredientRepo, userRepo, orderRepo);
+    reset(ingredientRepo, userRepo, orderRepo, paymentMethodRepo); //modificacion para TC-12
   }
 
   //TC-11 - Matriz HTTP deny-by-default y errores ApiProblem
@@ -221,4 +225,120 @@ public class Tc11AuthorizationIntegrationTest {
         .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
   }
   //Fin TC-11
+
+  //TC-12 - Tokenizacion requiere USER o ADMIN
+  @Test
+  public void shouldProtectPaymentTokenizationEndpoint() throws Exception {
+    mockMvc.perform(post("/api/payment-methods/tokenize")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+    mockMvc.perform(post("/api/payment-methods/tokenize")
+            .with(user("kitchen").roles("KITCHEN"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+    mockMvc.perform(post("/api/payment-methods/tokenize")
+            .with(user("alice").roles("USER"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.violations").isArray());
+  }
+
+  @Test
+  public void shouldReturnApiProblemForMissingOrForeignPaymentMethod() throws Exception {
+    User alice = new User("alice", "{bcrypt}hash", "Alice User", "Street", "City",
+        "TX", "78701", "555-0100", "alice@example.com");
+    User bob = new User("bob", "{bcrypt}hash", "Bob User", "Street", "City",
+        "TX", "78701", "555-0101", "bob@example.com");
+    PaymentMethod bobsPayment = new PaymentMethod(bob, "labtok_bob", "LAB_CARD",
+        "9999", "12/39");
+    bobsPayment.setId("PAYMENT-BOB");
+    when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
+    when(paymentMethodRepo.findById("MISSING")).thenReturn(Mono.empty());
+    when(paymentMethodRepo.findById("PAYMENT-BOB")).thenReturn(Mono.just(bobsPayment));
+
+    MvcResult missing = mockMvc.perform(post("/api/orders")
+            .with(user("alice").roles("USER"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(validOrderJson("MISSING")))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+    mockMvc.perform(asyncDispatch(missing))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("PAYMENT_METHOD_NOT_FOUND"));
+
+    MvcResult foreign = mockMvc.perform(post("/api/orders")
+            .with(user("alice").roles("USER"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(validOrderJson("PAYMENT-BOB")))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+    mockMvc.perform(asyncDispatch(foreign))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+    verify(orderRepo, never()).save(any(TacoOrder.class));
+  }
+
+  @Test
+  public void shouldTokenizeAndReturnOnlySafePaymentData() throws Exception {
+    User alice = new User("alice", "{bcrypt}hash", "Alice User", "Street", "City",
+        "TX", "78701", "555-0100", "alice@example.com");
+    when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
+    when(paymentMethodRepo.save(any(PaymentMethod.class))).thenAnswer(invocation -> {
+      PaymentMethod paymentMethod = invocation.getArgument(0);
+      paymentMethod.setId("PAYMENT1");
+      return Mono.just(paymentMethod);
+    });
+
+    MvcResult result = mockMvc.perform(post("/api/payment-methods/tokenize")
+            .with(user("alice").roles("USER"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"cardNumber\":\"9999999999999999\","
+                + "\"expiration\":\"12/39\",\"cvv\":\"999\"}"))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").value("PAYMENT1"))
+        .andExpect(jsonPath("$.brand").value("LAB_CARD"))
+        .andExpect(jsonPath("$.last4").value("9999"))
+        .andExpect(jsonPath("$.paymentToken").doesNotExist())
+        .andExpect(jsonPath("$.cardNumber").doesNotExist())
+        .andExpect(jsonPath("$.cvv").doesNotExist());
+  }
+
+  @Test
+  public void shouldAllowOnlyAdminToRunTc12Migration() throws Exception {
+    mockMvc.perform(post("/api/admin/migrations/tc12/payment-data")
+            .with(user("alice").roles("USER")))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+    MvcResult result = mockMvc.perform(post("/api/admin/migrations/tc12/payment-data")
+            .with(user("admin-test").roles("ADMIN")))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.documentsModified").isNumber());
+  }
+
+  private String validOrderJson(String paymentMethodId) {
+    return "{\"deliveryName\":\"Lab User\",\"deliveryStreet\":\"Lab Street\","
+        + "\"deliveryCity\":\"Lab City\",\"deliveryState\":\"LC\","
+        + "\"deliveryZip\":\"12345\",\"paymentMethodId\":\"" + paymentMethodId + "\","
+        + "\"tacos\":[{\"name\":\"Lab taco\",\"ingredientIds\":[\"FLTO\"]}]}";
+  }
+  //Fin TC-12
 }

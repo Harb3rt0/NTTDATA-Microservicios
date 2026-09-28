@@ -6,7 +6,6 @@ import java.util.List;
 import javax.validation.Valid;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -36,17 +35,9 @@ public class OrderCreateRequest {   //modificacion para TC-09
     @Size(min = 3, max = 12, message = "Delivery ZIP must contain between 3 and 12 characters")
     private String deliveryZip;
 
-    @NotBlank(message = "Credit card number is required")
-    @Pattern(regexp = "\\d{13,19}", message = "Credit card number must contain between 13 and 19 digits")
-    private String ccNumber;
-
-    @NotBlank(message = "Credit card expiration is required")
-    @Pattern(regexp = "^(0[1-9]|1[0-2])/\\d{2}$", message = "Credit card expiration must use MM/YY format")
-    private String ccExpiration;
-
-    @NotBlank(message = "Credit card CVV is required")
-    @Pattern(regexp = "\\d{3,4}", message = "Credit card CVV must contain 3 or 4 digits")
-    private String ccCVV;
+    @NotBlank(message = "Payment method is required")
+    @Size(max = 64, message = "Payment method identifier must not exceed 64 characters")
+    private String paymentMethodId; //modificacion para TC-12
 
     @Valid
     @NotEmpty(message = "At least one taco is required")

@@ -13,6 +13,10 @@ public final class ApiErrorCodes {
     public static final String INGREDIENT_ID_MISMATCH = "INGREDIENT_ID_MISMATCH";
     public static final String ORDER_USER_NOT_FOUND = "ORDER_USER_NOT_FOUND";
     public static final String ORDER_PAYMENT_METHOD_NOT_FOUND = "ORDER_PAYMENT_METHOD_NOT_FOUND";
+    //TC-12 - Codigos estables para tokenizacion y ownership de pago
+    public static final String PAYMENT_METHOD_NOT_FOUND = "PAYMENT_METHOD_NOT_FOUND";
+    public static final String PAYMENT_TOKENIZATION_FAILED = "PAYMENT_TOKENIZATION_FAILED";
+    //Fin TC-12
     public static final String ORDER_INGREDIENT_NOT_FOUND = "ORDER_INGREDIENT_NOT_FOUND";
     public static final String EMAIL_ORDER_REQUIRED = "EMAIL_ORDER_REQUIRED";
     public static final String EMAIL_TACOS_REQUIRED = "EMAIL_TACOS_REQUIRED";

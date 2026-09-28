@@ -8,8 +8,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import tacos.TacoOrder;
-
 @Service
 public class RabbitOrderMessagingService
        implements OrderMessagingService {
@@ -21,7 +19,7 @@ public class RabbitOrderMessagingService
     this.rabbit = rabbit;
   }
   
-  public void sendOrder(TacoOrder order) {
+  public void sendOrder(KitchenOrderEvent order) { //modificacion para TC-12
     rabbit.convertAndSend("tacocloud.order.queue", order,
         new MessagePostProcessor() {
           @Override

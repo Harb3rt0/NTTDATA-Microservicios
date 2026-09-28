@@ -47,7 +47,7 @@ public class OrderApiControllerTest {
         existingOrder.setId("ORDER1");
         existingOrder.setDeliveryState("CA");
         existingOrder.setDeliveryZip("90210");
-        existingOrder.setCcNumber("1111222233334444");
+        existingOrder.setPaymentMethodId("PAYMENT1"); //modificacion para TC-12
 
         when(orderService.patchOrder(Mockito.eq("ORDER1"), any(OrderPatchRequest.class),
             nullable(Authentication.class))).thenAnswer(invocation -> {
@@ -61,15 +61,15 @@ public class OrderApiControllerTest {
 
         testClient.patch().uri("/api/orders/ORDER1")
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"deliveryZip\":\"12345\", \"ccNumber\":\"9999999999999999\"}")
+            .bodyValue("{\"deliveryZip\":\"12345\", \"paymentMethodId\":\"OTHER_PAYMENT\"}")
             .exchange()
             .expectStatus().isOk()
             .expectBody()
             .jsonPath("$.deliveryZip").isEqualTo("12345")
             .jsonPath("$.deliveryState").isEqualTo("CA")
-            .jsonPath("$.ccNumber").doesNotExist();
+            .jsonPath("$.paymentMethodId").doesNotExist();
 
-        assertEquals("1111222233334444", existingOrder.getCcNumber());
+        assertEquals("PAYMENT1", existingOrder.getPaymentMethodId()); //modificacion para TC-12
     }
 
     @Test

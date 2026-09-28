@@ -51,9 +51,7 @@ public class OrderMapperTest {
         request.setDeliveryCity("Aguascalientes");
         request.setDeliveryState("AG");
         request.setDeliveryZip("20000");
-        request.setCcNumber("1111222233334444");
-        request.setCcExpiration("12/30");
-        request.setCcCVV("123");
+        request.setPaymentMethodId("PAYMENT1"); //modificacion para TC-12
 
         Ingredient carn = new Ingredient("CARN", "Carnitas", Ingredient.Type.PROTEIN);
 
@@ -120,9 +118,7 @@ public class OrderMapperTest {
         order.setId("ORDER1");
         order.setUser(user);
         order.setDeliveryName("Test User");
-        order.setCcNumber("1111222233334444");
-        order.setCcCVV("123");
-        order.setCcExpiration("12/30");
+        order.setPaymentMethodId("PAYMENT1"); //modificacion para TC-12
 
         OrderResponse response = orderMapper.toResponse(order);
 
@@ -136,7 +132,7 @@ public class OrderMapperTest {
         assertFalse(json.contains("ccCVV"));
         assertFalse(json.contains("ccExpiration"));
         assertFalse(json.contains("secretPassword"));
-        assertFalse(json.contains("1111222233334444"));
+        assertFalse(json.contains("PAYMENT1"));
         assertFalse(json.contains("USER1"));
     }
 

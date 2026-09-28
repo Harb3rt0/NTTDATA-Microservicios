@@ -10,7 +10,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import tacos.Ingredient.Type;
 import tacos.data.IngredientRepository;
-import tacos.data.PaymentMethodRepository;
 import tacos.data.TacoRepository;
 import tacos.data.UserRepository;
 
@@ -20,8 +19,7 @@ public class DevelopmentConfig {
 
   @Bean
   public CommandLineRunner dataLoader(IngredientRepository repo,
-        UserRepository userRepo, PasswordEncoder encoder, TacoRepository tacoRepo,
-        PaymentMethodRepository paymentMethodRepo) { // user repo for ease of testing with a built-in user
+        UserRepository userRepo, PasswordEncoder encoder, TacoRepository tacoRepo) { //modificacion para TC-12
     
     return new CommandLineRunner() {
       @Override
@@ -43,8 +41,7 @@ public class DevelopmentConfig {
               "Craig Walls", "123 North Street", "Cross Roads", "TX", 
               "76227", "123-123-1234", "craig@habuma.com"))
           .subscribe(user -> {
-              paymentMethodRepo.save(new PaymentMethod(user, "4111111111111111", "321", "10/25")).subscribe();
-          });        
+          });
         
         Taco taco1 = new Taco();
         taco1.setId("TACO1");

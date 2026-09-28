@@ -27,9 +27,7 @@ public class OrderMapper {
         order.setDeliveryCity(request.getDeliveryCity());
         order.setDeliveryState(request.getDeliveryState());
         order.setDeliveryZip(request.getDeliveryZip());
-        order.setCcNumber(request.getCcNumber());
-        order.setCcExpiration(request.getCcExpiration());
-        order.setCcCVV(request.getCcCVV());
+        order.setPaymentMethodId(request.getPaymentMethodId()); //modificacion para TC-12
         order.setTacos(tacos);
         return order;
     }

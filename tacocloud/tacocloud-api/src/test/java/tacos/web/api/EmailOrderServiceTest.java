@@ -69,9 +69,7 @@ public class EmailOrderServiceTest {
             .assertNext(order -> {
                 assertNotNull(order);
                 assertEquals(user, order.getUser());
-                assertEquals("1111222233334444", order.getCcNumber());
-                assertEquals("123", order.getCcCVV());
-                assertEquals("12/30", order.getCcExpiration());
+                assertEquals("PAYMENT1", order.getPaymentMethodId()); //modificacion para TC-12
                 assertEquals(2, order.getTacos().size());
                 assertEquals("Taco al pastor", order.getTacos().get(0).getName());
                 assertEquals(2, order.getTacos().get(0).getIngredients().size());
@@ -207,9 +205,10 @@ public class EmailOrderServiceTest {
     private PaymentMethod createPaymentMethod(User user) {
         PaymentMethod paymentMethod = new PaymentMethod(
             user,
-            "1111222233334444",
-            "123",
-            "12/30"
+            "labtok_test",
+            "LAB_CARD",
+            "9999",
+            "12/39"
         );
 
         paymentMethod.setId("PAYMENT1");

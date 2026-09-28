@@ -7,8 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Service;
 
-import tacos.TacoOrder;
-
 @Service
 public class JmsOrderMessagingService implements OrderMessagingService {
 
@@ -20,7 +18,7 @@ public class JmsOrderMessagingService implements OrderMessagingService {
   }
 
   @Override
-  public void sendOrder(TacoOrder order) {
+  public void sendOrder(KitchenOrderEvent order) { //modificacion para TC-12
     jms.convertAndSend("tacocloud.order.queue", order,
         this::addOrderSource);
   }

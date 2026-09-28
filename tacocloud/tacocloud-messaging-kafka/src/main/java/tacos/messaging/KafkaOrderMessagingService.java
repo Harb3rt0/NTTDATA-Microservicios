@@ -3,22 +3,21 @@ package tacos.messaging;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
-import tacos.TacoOrder;
 
 @Service
 public class KafkaOrderMessagingService
                                   implements OrderMessagingService {
   
-  private KafkaTemplate<String, TacoOrder> kafkaTemplate;
+  private KafkaTemplate<String, KitchenOrderEvent> kafkaTemplate; //modificacion para TC-12
   
   @Autowired
   public KafkaOrderMessagingService(
-          KafkaTemplate<String, TacoOrder> kafkaTemplate) {
+          KafkaTemplate<String, KitchenOrderEvent> kafkaTemplate) {
     this.kafkaTemplate = kafkaTemplate;
   }
   
   @Override
-  public void sendOrder(TacoOrder order) {
+  public void sendOrder(KitchenOrderEvent order) { //modificacion para TC-12
     kafkaTemplate.send("tacocloud.orders.topic", order);
   }
   

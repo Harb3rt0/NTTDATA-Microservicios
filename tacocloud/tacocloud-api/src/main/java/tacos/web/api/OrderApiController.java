@@ -58,22 +58,6 @@ public class OrderApiController {
     return orderService.findOrders(authentication).map(orderMapper::toResponse);
   }
 
-  // @PostMapping(consumes="application/json")
-  // @ResponseStatus(HttpStatus.CREATED)
-  // public Mono<Order> postOrder(@RequestBody Mono<Order> order) {
-  // order.subscribe(orderMessages::sendOrder); // TODO: not ideal...work into
-  // reactive flow below
-  // return order
-  // .flatMap(repo::save);
-  // }
-
-  // @PostMapping(consumes = "application/json")
-  // @ResponseStatus(HttpStatus.CREATED)
-  // public Mono<TacoOrder> postOrder(@RequestBody TacoOrder order) {
-  //   orderMessages.sendOrder(order);
-  //   return repo.save(order);
-  // }
-
   //TC-08 - Separar DTOs de entrada, respuesta y persistencia
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
@@ -85,15 +69,6 @@ public class OrderApiController {
   }
   //TC-08 - Fin
 
-  // @PostMapping(path = "fromEmail", consumes = "application/json")
-  // @ResponseStatus(HttpStatus.CREATED)
-  // public Mono<TacoOrder> postOrderFromEmail(@RequestBody Mono<EmailOrder> emailOrder) {
-  //   Mono<TacoOrder> order = emailOrderService.convertEmailOrderToDomainOrder(emailOrder);
-  //   order.subscribe(orderMessages::sendOrder); // TODO: not ideal...work into reactive flow below
-  //   return order
-  //       .flatMap(repo::save);
-  // }
-
   //TC-06 - Convertir ordenes de correo sin carreras ni nulls sorpresa
   @PostMapping(path = "fromEmail", consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
@@ -103,10 +78,6 @@ public class OrderApiController {
     return emailOrderService.convertEmailOrderToDomainOrder(Mono.just(emailOrder))
       .flatMap(orderService::saveAndPublish)
       .map(orderMapper::toResponse);
-      // .flatMap(savedOrder ->
-      //   Mono.fromRunnable(() -> orderMessages.sendOrder(savedOrder))
-      //   .thenReturn(savedOrder)
-      // );
     //TC-07 - Fin
   }
   //TC-06 - Fin
