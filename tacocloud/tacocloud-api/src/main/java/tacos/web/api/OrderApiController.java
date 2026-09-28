@@ -6,8 +6,8 @@ import javax.validation.constraints.Size;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -26,8 +26,6 @@ import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
 import tacos.api.dto.OrderResponse;
 import tacos.api.dto.OrderUpdateRequest;
-import tacos.api.error.ApiErrorCodes;
-import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.OrderMapper;
 import tacos.data.OrderRepository;
 import tacos.messaging.OrderMessagingService;
@@ -35,7 +33,6 @@ import tacos.messaging.OrderMessagingService;
 @RestController
 @Validated
 @RequestMapping(path = "/api/orders", produces = "application/json")
-@CrossOrigin(origins = "http://localhost:8080")
 public class OrderApiController {
 
   private final OrderMapper orderMapper;
@@ -56,8 +53,9 @@ public class OrderApiController {
   }
 
   @GetMapping(produces = "application/json")
-  public Flux<OrderResponse> allOrders() {
-    return repo.findAll().map(orderMapper::toResponse);
+  public Flux<OrderResponse> allOrders(Authentication authentication) {
+    //modificacion para TC-11
+    return orderService.findOrders(authentication).map(orderMapper::toResponse);
   }
 
   // @PostMapping(consumes="application/json")
@@ -79,8 +77,10 @@ public class OrderApiController {
   //TC-08 - Separar DTOs de entrada, respuesta y persistencia
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
-  public Mono<OrderResponse> postOrder(@Valid @RequestBody OrderCreateRequest request) {
-    return orderService.createOrder(request)
+  public Mono<OrderResponse> postOrder(@Valid @RequestBody OrderCreateRequest request,
+      Authentication authentication) {
+    //modificacion para TC-11
+    return orderService.createOrder(request, authentication)
       .map(orderMapper::toResponse);
   }
   //TC-08 - Fin
@@ -118,9 +118,10 @@ public class OrderApiController {
   @PutMapping(path = "/{orderId}", consumes = "application/json")
   public Mono<ResponseEntity<OrderResponse>> putOrder(
       @PathVariable("orderId") @NotBlank @Size(max = 64) String orderId,
-      @Valid @RequestBody OrderUpdateRequest order) {
+      @Valid @RequestBody OrderUpdateRequest order, Authentication authentication) {
+    //modificacion para TC-11
     return orderService
-        .updateOrder(orderId, order)
+        .updateOrder(orderId, order, authentication)
         .map(orderMapper::toResponse)
         .map(ResponseEntity::ok);
   }
@@ -131,17 +132,10 @@ public class OrderApiController {
   //adaptacion para TC-08
   public Mono<OrderResponse> patchOrder(
       @PathVariable("orderId") @NotBlank @Size(max = 64) String orderId,
-      @Valid @RequestBody OrderPatchRequest patch) {
+      @Valid @RequestBody OrderPatchRequest patch, Authentication authentication) {
 
-    //modificacion pata TC-08
-    return repo.findById(orderId)
-        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
-            ApiErrorCodes.ORDER_NOT_FOUND, "Order was not found.")))
-        .map(order -> {
-            orderMapper.patchEntity(patch, order);
-            return order;
-        })
-        .flatMap(repo::save)
+    //modificacion para TC-11
+    return orderService.patchOrder(orderId, patch, authentication)
         .map(orderMapper::toResponse);
   }
   // TC-04 - Fin
@@ -152,12 +146,11 @@ public class OrderApiController {
    */
   @DeleteMapping("/{orderId}")
   public Mono<ResponseEntity<Void>> deleteOrder(
-      @PathVariable("orderId") @NotBlank @Size(max = 64) String orderId) {
-    return repo.findById(orderId)
-        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
-            ApiErrorCodes.ORDER_NOT_FOUND, "Order was not found.")))
-        .flatMap(order -> repo.deleteById(order.getId())
-            .thenReturn(ResponseEntity.noContent().<Void>build()));
+      @PathVariable("orderId") @NotBlank @Size(max = 64) String orderId,
+      Authentication authentication) {
+    //modificacion para TC-11
+    return orderService.deleteOrder(orderId, authentication)
+        .thenReturn(ResponseEntity.noContent().<Void>build());
   }
   // TC-05 - Fin caso DELETE
 }

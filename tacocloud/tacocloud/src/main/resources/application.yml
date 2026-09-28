@@ -12,6 +12,12 @@ taco:
     codes:
       abcdef: 10
 
+tacocloud:
+  security:
+    allowed-origin: ${TACOCLOUD_ALLOWED_ORIGIN:http://localhost:8080} #modificacion para TC-11
+  tc11-demo:
+    password: ${TACOCLOUD_TC11_DEMO_PASSWORD:} #modificacion para TC-11
+
 
 
 #logging:
@@ -72,7 +78,8 @@ management:
 #tag::healthShowDetails[]
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized #modificacion para TC-11
+      roles: ROLE_ADMIN
 #end::healthShowDetails[]
 #tag::infoGitModeFull[]
   info:

@@ -13,4 +13,8 @@ public interface OrderRepository
   Flux<TacoOrder> findByUserOrderByPlacedAtDesc(
           User user, Pageable pageable);
 
+  //TC-11 - Consulta de pedidos por la identidad autenticada
+  Flux<TacoOrder> findByUserUsernameOrderByPlacedAtDesc(String username);
+  //Fin TC-11
+
 }

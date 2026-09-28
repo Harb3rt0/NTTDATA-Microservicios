@@ -1,8 +1,12 @@
 package tacos;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.PersistenceConstructor;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.
@@ -12,14 +16,12 @@ import org.springframework.security.core.userdetails.UserDetails;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Data
 @NoArgsConstructor(access=AccessLevel.PRIVATE, force=true)
-@RequiredArgsConstructor
 @Document
 public class User implements UserDetails {
 
@@ -40,10 +42,32 @@ public class User implements UserDetails {
   private final String zip;
   private final String phoneNumber;
   private final String email;
+  private Set<String> roles = new HashSet<>(Collections.singleton("ROLE_USER")); //modificacion para TC-11
+
+  //TC-11 - Constructor explícito para reconstruir usuarios almacenados en Mongo
+  @PersistenceConstructor
+  public User(String username, String password, String fullname, String street,
+      String city, String state, String zip, String phoneNumber, String email) {
+    this.username = username;
+    this.password = password;
+    this.fullname = fullname;
+    this.street = street;
+    this.city = city;
+    this.state = state;
+    this.zip = zip;
+    this.phoneNumber = phoneNumber;
+    this.email = email;
+  }
+  //Fin TC-11
   
   @Override
   public Collection<? extends GrantedAuthority> getAuthorities() {
-    return Arrays.asList(new SimpleGrantedAuthority("ROLE_USER"));
+    //modificacion para TC-11
+    Set<String> effectiveRoles = roles == null || roles.isEmpty()
+        ? Collections.singleton("ROLE_USER") : roles;
+    return effectiveRoles.stream()
+        .map(SimpleGrantedAuthority::new)
+        .collect(Collectors.toList());
   }
 
   @Override

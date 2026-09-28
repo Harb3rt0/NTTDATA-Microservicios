@@ -2,7 +2,7 @@ package tacos.web.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import reactor.core.publisher.Mono;
@@ -21,6 +22,8 @@ import tacos.TacoOrder;
 import tacos.api.dto.OrderPatchRequest;
 import tacos.api.dto.OrderResponse;
 import tacos.api.dto.OrderUpdateRequest;
+import tacos.api.error.ApiErrorCodes;
+import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.IngredientMapper;
 import tacos.api.mapper.OrderMapper;
 import tacos.api.mapper.TacoMapper;
@@ -46,8 +49,11 @@ public class OrderApiControllerTest {
         existingOrder.setDeliveryZip("90210");
         existingOrder.setCcNumber("1111222233334444");
 
-        when(orderRepo.findById("ORDER1")).thenReturn(Mono.just(existingOrder));
-        when(orderRepo.save(any(TacoOrder.class))).thenAnswer(i -> Mono.just(i.getArguments()[0]));
+        when(orderService.patchOrder(Mockito.eq("ORDER1"), any(OrderPatchRequest.class),
+            nullable(Authentication.class))).thenAnswer(invocation -> {
+                orderMapper.patchEntity(invocation.getArgument(1), existingOrder);
+                return Mono.just(existingOrder);
+            });
 
         WebTestClient testClient = WebTestClient.bindToController(
             new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
@@ -76,7 +82,9 @@ public class OrderApiControllerTest {
         TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
         OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
-        when(orderRepo.findById("NON_EXISTING")).thenReturn(Mono.empty());
+        when(orderService.patchOrder(Mockito.eq("NON_EXISTING"), any(OrderPatchRequest.class),
+            nullable(Authentication.class))).thenReturn(Mono.error(new ResourceNotFoundException(
+                ApiErrorCodes.ORDER_NOT_FOUND, "Order was not found.")));
 
         WebTestClient testClient = WebTestClient.bindToController(
             new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
@@ -120,7 +128,8 @@ public class OrderApiControllerTest {
         updatedOrder.setDeliveryState("JC");
         updatedOrder.setDeliveryZip("44100");
 
-        when(orderService.updateOrder(Mockito.eq("ORDER1"), any(OrderUpdateRequest.class)))
+        when(orderService.updateOrder(Mockito.eq("ORDER1"), any(OrderUpdateRequest.class),
+            nullable(Authentication.class)))
             .thenReturn(Mono.just(updatedOrder));
 
         WebTestClient testClient = WebTestClient.bindToController(
@@ -142,8 +151,10 @@ public class OrderApiControllerTest {
                 assertEquals("44100", responseOrder.getDeliveryZip());
             });
 
-        verify(orderService).updateOrder(Mockito.eq("ORDER1"), any(OrderUpdateRequest.class));
-        verify(orderService, never()).updateOrder(Mockito.eq("OTHER_ORDER"), any(OrderUpdateRequest.class));
+        verify(orderService).updateOrder(Mockito.eq("ORDER1"), any(OrderUpdateRequest.class),
+            nullable(Authentication.class));
+        verify(orderService, never()).updateOrder(Mockito.eq("OTHER_ORDER"),
+            any(OrderUpdateRequest.class), nullable(Authentication.class));
     }
     
     @Test
@@ -159,8 +170,8 @@ public class OrderApiControllerTest {
         TacoOrder existingOrder = new TacoOrder();
         existingOrder.setId("ORDER1");
 
-        when(orderRepo.findById("ORDER1")).thenReturn(Mono.just(existingOrder));
-        when(orderRepo.deleteById("ORDER1")).thenReturn(Mono.empty());
+        when(orderService.deleteOrder(Mockito.eq("ORDER1"), nullable(Authentication.class)))
+            .thenReturn(Mono.empty());
 
         WebTestClient testClient = WebTestClient.bindToController(
             new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
@@ -172,8 +183,8 @@ public class OrderApiControllerTest {
             .expectBody()
             .isEmpty();
 
-        verify(orderRepo).findById("ORDER1");
-        verify(orderRepo, times(1)).deleteById("ORDER1");
+        verify(orderService, times(1)).deleteOrder(Mockito.eq("ORDER1"),
+            nullable(Authentication.class));
     }
 
     @Test
@@ -186,7 +197,9 @@ public class OrderApiControllerTest {
         TacoMapper tacoMapper = new TacoMapper(ingredientMapper);
         OrderMapper orderMapper = new OrderMapper(tacoMapper);
 
-        when(orderRepo.findById("NON_EXISTING")).thenReturn(Mono.empty());
+        when(orderService.deleteOrder(Mockito.eq("NON_EXISTING"), nullable(Authentication.class)))
+            .thenReturn(Mono.error(new ResourceNotFoundException(
+                ApiErrorCodes.ORDER_NOT_FOUND, "Order was not found.")));
 
         WebTestClient testClient = WebTestClient.bindToController(
             new OrderApiController(orderRepo, orderMessages, emailOrderService, orderService, orderMapper)
@@ -196,8 +209,7 @@ public class OrderApiControllerTest {
             .exchange()
             .expectStatus().isNotFound();
 
-        verify(orderRepo).findById("NON_EXISTING");
-        verify(orderRepo, never()).deleteById(anyString());
+        verify(orderService).deleteOrder(Mockito.eq("NON_EXISTING"), nullable(Authentication.class));
     }
     //final de pruebas TC-05
 
