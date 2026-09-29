@@ -13,6 +13,12 @@ taco:
       abcdef: 10
 
 tacocloud:
+  # TC-14 - Politica economica del pedido
+  order:
+    max-item-quantity: 10
+  pricing:
+    currency: USD
+  # Fin TC-14
   security:
     allowed-origin: ${TACOCLOUD_ALLOWED_ORIGIN:http://localhost:8080} #modificacion para TC-11
   tc11-demo:

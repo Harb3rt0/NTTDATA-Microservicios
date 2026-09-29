@@ -40,7 +40,8 @@ public class OrderCreateRequest {   //modificacion para TC-09
     private String paymentMethodId; //modificacion para TC-12
 
     @Valid
-    @NotEmpty(message = "At least one taco is required")
-    @Size(max = 20, message = "An order cannot contain more than 20 tacos")
-    private List<TacoCreateRequest> tacos = new ArrayList<>();
+    //modificacion para TC-14
+    @NotEmpty(message = "At least one item is required")
+    @Size(max = 20, message = "An order cannot contain more than 20 items")
+    private List<OrderLineCreateRequest> items = new ArrayList<>();
 }

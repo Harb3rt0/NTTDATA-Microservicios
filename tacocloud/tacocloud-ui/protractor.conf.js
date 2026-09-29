@@ -9,7 +9,12 @@ exports.config = {
     './e2e/**/*.e2e-spec.ts'
   ],
   capabilities: {
-    'browserName': 'chrome'
+    'browserName': 'chrome',
+    //TC-14 - Ejecucion E2E reproducible sin ventana ni GPU
+    'chromeOptions': {
+      args: ['--headless', '--disable-gpu', '--no-sandbox']
+    }
+    //Fin TC-14
   },
   directConnect: true,
   baseUrl: 'http://localhost:4200/',

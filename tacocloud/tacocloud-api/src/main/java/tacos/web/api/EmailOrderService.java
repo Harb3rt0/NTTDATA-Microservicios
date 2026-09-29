@@ -28,13 +28,16 @@ public class EmailOrderService {
   private UserRepository userRepo;
   private IngredientRepository ingredientRepo;
   private PaymentMethodRepository paymentMethodRepo;
+  private final OrderPricingService pricingService;
 
   public EmailOrderService(UserRepository userRepo, IngredientRepository ingredientRepo,
-      PaymentMethodRepository paymentMethodRepo, IngredientController ingredientController) {
+      PaymentMethodRepository paymentMethodRepo, IngredientController ingredientController,
+      OrderPricingService pricingService) { //modificacion para TC-14
     this.userRepo = userRepo;
     this.ingredientRepo = ingredientRepo;
     this.paymentMethodRepo = paymentMethodRepo;
     this.ingredientController = ingredientController;
+    this.pricingService = pricingService;
   }
 
   //TC-06 - Convertir ordenes de correo sin carreras ni nulls sorpresa
@@ -67,11 +70,11 @@ public class EmailOrderService {
                   Taco taco = new Taco();
                   taco.setName(emailTaco.getName());
                   taco.setIngredients(ingredients);
-                  return taco;
+                  return pricingService.priceResolvedTaco(taco, 1); //modificacion para TC-14
                 })
             )
             .collectList()
-            .map(tacos -> {
+            .map(items -> { //modificacion para TC-14
               TacoOrder order = new TacoOrder();
               order.setUser(user);
               order.setPaymentMethodId(paymentMethod.getId()); //modificacion para TC-12
@@ -81,7 +84,9 @@ public class EmailOrderService {
               order.setDeliveryState(user.getState());
               order.setDeliveryZip(user.getZip());
               order.setPlacedAt(new Date());
-              tacos.forEach(order::addTaco);
+              items.forEach(order::addItem); //modificacion para TC-14
+              order.setTotal(pricingService.calculateTotal(items));
+              order.setCurrency(pricingService.getCurrency());
               return order;
             })
           )

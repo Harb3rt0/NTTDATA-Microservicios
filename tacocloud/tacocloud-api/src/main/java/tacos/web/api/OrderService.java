@@ -6,20 +6,15 @@ import org.springframework.stereotype.Service;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import tacos.Taco;
 import tacos.TacoOrder;
 import tacos.User;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
 import tacos.api.dto.OrderUpdateRequest;
-import tacos.api.dto.TacoCreateRequest;
 import tacos.api.error.ApiErrorCodes;
-import tacos.api.error.BusinessRuleException;
 import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.KitchenOrderEventMapper;
 import tacos.api.mapper.OrderMapper;
-import tacos.api.mapper.TacoMapper;
-import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
@@ -28,24 +23,25 @@ import tacos.messaging.OrderMessagingService;
 @Service 
 public class OrderService {
     private final OrderRepository repo;
-    private final IngredientRepository ingredientRepo;
     private final OrderMessagingService orderMessages;
-    private final TacoMapper tacoMapper;
     private final OrderMapper orderMapper;
     private final UserRepository userRepo;
     private final PaymentMethodRepository paymentMethodRepo;
     private final KitchenOrderEventMapper kitchenOrderEventMapper;
+    private final OrderPricingService pricingService;
 
     //modificacion para TC-08
-    public OrderService(OrderRepository repo, IngredientRepository ingredientRepo, OrderMessagingService orderMessages, TacoMapper tacoMapper, OrderMapper orderMapper, UserRepository userRepo, PaymentMethodRepository paymentMethodRepo, KitchenOrderEventMapper kitchenOrderEventMapper) {
+    //modificacion para TC-14
+    public OrderService(OrderRepository repo, OrderMessagingService orderMessages, OrderMapper orderMapper,
+            UserRepository userRepo, PaymentMethodRepository paymentMethodRepo,
+            KitchenOrderEventMapper kitchenOrderEventMapper, OrderPricingService pricingService) {
         this.repo = repo;
-        this.ingredientRepo = ingredientRepo;
         this.orderMessages = orderMessages;
-        this.tacoMapper = tacoMapper;
         this.orderMapper = orderMapper;
         this.userRepo = userRepo; //modificacion para TC-11
         this.paymentMethodRepo = paymentMethodRepo; //modificacion para TC-12
         this.kitchenOrderEventMapper = kitchenOrderEventMapper; //modificacion para TC-12
+        this.pricingService = pricingService; //modificacion para TC-14
     }
 
     //TC-07 - Una sola suscripcion para guarar y publicar
@@ -60,26 +56,15 @@ public class OrderService {
     //TC-07 - Fin
 
     //TC-08 - Separar DTOs de entrada, respuesta y persistencia
-    private Mono<Taco> resolveTaco(TacoCreateRequest request) {
-        return Flux.fromIterable(request.getIngredientIds())
-            .concatMap(ingredientId -> ingredientRepo.findById(ingredientId)
-                .switchIfEmpty(Mono.error(new BusinessRuleException(
-                    ApiErrorCodes.ORDER_INGREDIENT_NOT_FOUND,
-                    "Ingredient '" + ingredientId + "' is not available.")))
-            )
-            .collectList()
-            .map(ingredients -> tacoMapper.toEntity(request, ingredients));
-    }
-
     public Mono<TacoOrder> createOrder(OrderCreateRequest request, Authentication authentication) {
         //modificacion para TC-11
         return authenticatedUser(authentication)
             .flatMap(user -> ownedPaymentMethod(request.getPaymentMethodId(), user) //modificacion para TC-12
-                .flatMap(paymentMethod -> Flux.fromIterable(request.getTacos())
-                    .concatMap(this::resolveTaco)
+                .flatMap(paymentMethod -> pricingService.priceItems(request.getItems())
                     .collectList()
-                    .map(tacos -> {
-                        TacoOrder order = orderMapper.toEntity(request, tacos);
+                    .map(items -> {
+                        TacoOrder order = orderMapper.toEntity(request, items,
+                            pricingService.calculateTotal(items), pricingService.getCurrency());
                         order.setUser(user);
                         order.setPaymentMethodId(paymentMethod.getId());
                         return order;
@@ -91,9 +76,10 @@ public class OrderService {
         //modificacion para TC-11
         return accessibleOrder(orderId, authentication)
         .flatMap(existingOrder ->
-            Flux.fromIterable(request.getTacos()).concatMap(this::resolveTaco)
+            pricingService.priceItems(request.getItems())
                 .collectList()
-                .map(tacos -> { orderMapper.updateEntity(request, existingOrder, tacos);
+                .map(items -> { orderMapper.updateEntity(request, existingOrder, items,
+                        pricingService.calculateTotal(items), pricingService.getCurrency());
                     return existingOrder;
                 })
                 .flatMap(repo::save)

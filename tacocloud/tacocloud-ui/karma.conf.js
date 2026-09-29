@@ -28,6 +28,14 @@ module.exports = function (config) {
     logLevel: config.LOG_INFO,
     autoWatch: true,
     browsers: ['Chrome'],
+    //TC-14 - Lanzador estable para pruebas headless en Windows
+    customLaunchers: {
+      ChromeHeadlessTc14: {
+        base: 'ChromeHeadless',
+        flags: ['--disable-gpu', '--no-sandbox']
+      }
+    },
+    //Fin TC-14
     singleRun: false
   });
 };

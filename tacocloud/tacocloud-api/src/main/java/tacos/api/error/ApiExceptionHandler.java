@@ -13,6 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
@@ -30,6 +32,7 @@ import tacos.security.UserAlreadyExistsException;
 @RestControllerAdvice
 public class ApiExceptionHandler {
     public static final MediaType PROBLEM_JSON = MediaType.valueOf("application/problem+json");
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiProblem> handleValidation(MethodArgumentNotValidException ex,
@@ -165,6 +168,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiProblem> handleUnexpected(Exception ex, HttpServletRequest request) {
+        log.error("Unexpected error processing {} {}", request.getMethod(),
+            request.getRequestURI(), ex); //modificacion para TC-14
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "urn:tacocloud:problem:internal",
             "Internal server error", "An unexpected error occurred.", ApiErrorCodes.INTERNAL_ERROR,
             request, Collections.emptyList());

@@ -141,7 +141,8 @@ public class OrderApiControllerTest {
             .bodyValue("{\"id\":\"OTHER_ORDER\",\"deliveryName\":\"Updated Name\","
                 + "\"deliveryStreet\":\"Updated Street\",\"deliveryCity\":\"Updated City\","
                 + "\"deliveryState\":\"JC\",\"deliveryZip\":\"44100\","
-                + "\"tacos\":[{\"name\":\"Test taco\",\"ingredientIds\":[\"FLTO\"]}]}")
+                + "\"items\":[{\"taco\":{\"name\":\"Test taco\","
+                + "\"ingredientIds\":[\"FLTO\"]},\"quantity\":1}]}") //modificacion para TC-14
             .exchange()
             .expectStatus().isOk()
             .expectBody(OrderResponse.class)

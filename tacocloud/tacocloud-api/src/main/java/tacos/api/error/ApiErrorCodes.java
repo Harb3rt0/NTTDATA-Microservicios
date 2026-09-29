@@ -22,6 +22,10 @@ public final class ApiErrorCodes {
     public static final String PAYMENT_TOKENIZATION_FAILED = "PAYMENT_TOKENIZATION_FAILED";
     //Fin TC-12
     public static final String ORDER_INGREDIENT_NOT_FOUND = "ORDER_INGREDIENT_NOT_FOUND";
+    //TC-14 - Codigos estables para cantidades de pedido
+    public static final String INVALID_ITEM_QUANTITY = "INVALID_ITEM_QUANTITY";
+    public static final String ITEM_QUANTITY_LIMIT_EXCEEDED = "ITEM_QUANTITY_LIMIT_EXCEEDED";
+    //Fin TC-14
     public static final String EMAIL_ORDER_REQUIRED = "EMAIL_ORDER_REQUIRED";
     public static final String EMAIL_TACOS_REQUIRED = "EMAIL_TACOS_REQUIRED";
     public static final String EMAIL_TACO_INGREDIENTS_REQUIRED = "EMAIL_TACO_INGREDIENTS_REQUIRED";

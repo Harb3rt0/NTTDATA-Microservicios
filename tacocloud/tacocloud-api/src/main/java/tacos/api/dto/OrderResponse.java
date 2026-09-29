@@ -1,5 +1,6 @@
 package tacos.api.dto;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -15,5 +16,9 @@ public class OrderResponse {
     private String deliveryCity;
     private String deliveryState;
     private String deliveryZip;
-    private List<TacoResponse> tacos = new ArrayList<>();
+    //TC-14 - Totales y lineas seguras de la orden
+    private List<OrderLineResponse> items = new ArrayList<>();
+    private BigDecimal total;
+    private String currency;
+    //Fin TC-14
 }

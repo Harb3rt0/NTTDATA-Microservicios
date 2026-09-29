@@ -17,7 +17,7 @@ export class CartComponent implements OnInit {
     deliveryState: '',
     deliveryZip: '',
     paymentMethodId: '', //modificacion para TC-12
-    tacos: []
+    items: [] //modificacion para TC-14
   };
 
   //TC-12 - Datos efimeros enviados solo al endpoint de tokenizacion
@@ -43,10 +43,14 @@ export class CartComponent implements OnInit {
   }
 
   onSubmit() {
-    // this.model.tacos = this.cart.getItemsInCart();
-    this.cart.getItemsInCart().forEach(cartItem => {
-      this.model.tacos.push(cartItem.taco);
-    });
+    //modificacion para TC-14
+    this.model.items = this.cart.getItemsInCart().map(cartItem => ({
+      taco: {
+        name: cartItem.taco.name,
+        ingredientIds: cartItem.taco.ingredients.map(ingredient => ingredient.id)
+      },
+      quantity: Number(cartItem.quantity)
+    }));
 
     const headers = new HttpHeaders().set('Content-type', 'application/json')
         .set('Accept', 'application/json');

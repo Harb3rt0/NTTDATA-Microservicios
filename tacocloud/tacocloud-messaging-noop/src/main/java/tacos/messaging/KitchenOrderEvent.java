@@ -25,6 +25,7 @@ public class KitchenOrderEvent implements Serializable {
   public static class KitchenTaco implements Serializable {
     private static final long serialVersionUID = 1L;
     private String name;
+    private int quantity; //modificacion para TC-14
     private List<KitchenIngredient> ingredients = new ArrayList<>();
   }
 

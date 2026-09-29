@@ -3,6 +3,7 @@ package tacos.api.mapper;
 import org.springframework.stereotype.Component;
 
 import tacos.Ingredient;
+import tacos.OrderLine;
 import tacos.Taco;
 import tacos.TacoOrder;
 import tacos.messaging.KitchenOrderEvent;
@@ -23,13 +24,15 @@ public class KitchenOrderEventMapper {
         event.setDeliveryState(order.getDeliveryState());
         event.setDeliveryZip(order.getDeliveryZip());
 
-        order.getTacos().forEach(taco -> event.getTacos().add(toTaco(taco)));
+        order.getItems().forEach(item -> event.getTacos().add(toTaco(item))); //modificacion para TC-14
         return event;
     }
 
-    private KitchenTaco toTaco(Taco taco) {
+    private KitchenTaco toTaco(OrderLine item) { //modificacion para TC-14
+        Taco taco = item.getTaco();
         KitchenTaco kitchenTaco = new KitchenTaco();
         kitchenTaco.setName(taco.getName());
+        kitchenTaco.setQuantity(item.getQuantity());
         taco.getIngredients().forEach(ingredient ->
             kitchenTaco.getIngredients().add(toIngredient(ingredient)));
         return kitchenTaco;

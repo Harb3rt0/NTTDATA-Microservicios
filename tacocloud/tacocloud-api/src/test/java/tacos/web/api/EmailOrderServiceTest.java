@@ -24,6 +24,8 @@ import tacos.Taco;
 import tacos.User;
 import tacos.api.error.BusinessRuleException;
 import tacos.api.error.ApiErrorCodes;
+import tacos.api.mapper.IngredientMapper;
+import tacos.api.mapper.TacoMapper;
 import tacos.data.IngredientRepository;
 import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
@@ -38,7 +40,8 @@ public class EmailOrderServiceTest {
         PaymentMethodRepository paymentMethodRepo = Mockito.mock(PaymentMethodRepository.class);
         IngredientController ingredientController = Mockito.mock(IngredientController.class);
 
-        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo, paymentMethodRepo, ingredientController);
+        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo,
+            paymentMethodRepo, ingredientController, pricingService(ingredientRepo)); //modificacion para TC-14
 
         User user = createUser();
         PaymentMethod paymentMethod = createPaymentMethod(user);
@@ -70,14 +73,15 @@ public class EmailOrderServiceTest {
                 assertNotNull(order);
                 assertEquals(user, order.getUser());
                 assertEquals("PAYMENT1", order.getPaymentMethodId()); //modificacion para TC-12
-                assertEquals(2, order.getTacos().size());
-                assertEquals("Taco al pastor", order.getTacos().get(0).getName());
-                assertEquals(2, order.getTacos().get(0).getIngredients().size());
-                assertEquals("CARN", order.getTacos().get(0).getIngredients().get(0).getId());
-                assertEquals("CHED", order.getTacos().get(0).getIngredients().get(1).getId());
-                assertEquals("Taco especial", order.getTacos().get(1).getName());
-                assertEquals("FLTO", order.getTacos().get(1).getIngredients().get(0).getId());
-                assertEquals("CHED", order.getTacos().get(1).getIngredients().get(1).getId());
+                assertEquals(2, order.getItems().size()); //modificacion para TC-14
+                assertEquals(1, order.getItems().get(0).getQuantity());
+                assertEquals("Taco al pastor", order.getItems().get(0).getTaco().getName());
+                assertEquals(2, order.getItems().get(0).getTaco().getIngredients().size());
+                assertEquals("CARN", order.getItems().get(0).getTaco().getIngredients().get(0).getId());
+                assertEquals("CHED", order.getItems().get(0).getTaco().getIngredients().get(1).getId());
+                assertEquals("Taco especial", order.getItems().get(1).getTaco().getName());
+                assertEquals("FLTO", order.getItems().get(1).getTaco().getIngredients().get(0).getId());
+                assertEquals("CHED", order.getItems().get(1).getTaco().getIngredients().get(1).getId());
                 assertNotNull(order.getPlacedAt());
             })
             .verifyComplete();
@@ -96,7 +100,8 @@ public class EmailOrderServiceTest {
         PaymentMethodRepository paymentMethodRepo = Mockito.mock(PaymentMethodRepository.class);
         IngredientController ingredientController = Mockito.mock(IngredientController.class);
 
-        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo, paymentMethodRepo, ingredientController);
+        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo,
+            paymentMethodRepo, ingredientController, pricingService(ingredientRepo)); //modificacion para TC-14
 
         User user = createUser();
         PaymentMethod paymentMethod = createPaymentMethod(user);
@@ -133,7 +138,8 @@ public class EmailOrderServiceTest {
         PaymentMethodRepository paymentMethodRepo = Mockito.mock(PaymentMethodRepository.class);
         IngredientController ingredientController = Mockito.mock(IngredientController.class);
 
-        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo, paymentMethodRepo, ingredientController);
+        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo,
+            paymentMethodRepo, ingredientController, pricingService(ingredientRepo)); //modificacion para TC-14
 
         EmailOrder emailOrder = new EmailOrder();
         emailOrder.setEmail("unknown@gmail.com");
@@ -161,7 +167,8 @@ public class EmailOrderServiceTest {
         PaymentMethodRepository paymentMethodRepo = Mockito.mock(PaymentMethodRepository.class);
         IngredientController ingredientController = Mockito.mock(IngredientController.class);
 
-        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo, paymentMethodRepo, ingredientController);
+        EmailOrderService emailOrderService = new EmailOrderService(userRepo, ingredientRepo,
+            paymentMethodRepo, ingredientController, pricingService(ingredientRepo)); //modificacion para TC-14
 
         User user = createUser();
 
@@ -215,4 +222,11 @@ public class EmailOrderServiceTest {
 
         return paymentMethod;
     }
+
+    //TC-14 - Crea la politica de precios usada por el flujo de correo
+    private OrderPricingService pricingService(IngredientRepository ingredientRepo) {
+        return new OrderPricingService(ingredientRepo,
+            new TacoMapper(new IngredientMapper()), 10, "USD");
+    }
+    //Fin TC-14
 }

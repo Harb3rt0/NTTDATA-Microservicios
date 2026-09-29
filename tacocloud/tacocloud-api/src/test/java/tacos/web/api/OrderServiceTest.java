@@ -12,7 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,12 +24,14 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.MonoProcessor;
 import reactor.test.StepVerifier;
 import tacos.Ingredient;
 import tacos.PaymentMethod;
 import tacos.TacoOrder;
 import tacos.User;
 import tacos.api.dto.OrderCreateRequest;
+import tacos.api.dto.OrderLineCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
 import tacos.api.dto.TacoCreateRequest;
 import tacos.api.error.ApiErrorCodes;
@@ -53,6 +58,7 @@ public class OrderServiceTest {
     private TacoMapper tacoMapper;
     private OrderMapper orderMapper;
     private KitchenOrderEventMapper kitchenOrderEventMapper;
+    private OrderPricingService pricingService;
     private OrderService orderService;
 
     @BeforeEach
@@ -66,9 +72,10 @@ public class OrderServiceTest {
         tacoMapper = new TacoMapper(ingredientMapper);
         orderMapper = new OrderMapper(tacoMapper);
         kitchenOrderEventMapper = new KitchenOrderEventMapper();
+        pricingService = new OrderPricingService(ingredientRepo, tacoMapper, 10, "USD");
         
-        orderService = new OrderService(orderRepo, ingredientRepo, orderMessages, tacoMapper,
-            orderMapper, userRepo, paymentMethodRepo, kitchenOrderEventMapper); //modificacion para TC-12
+        orderService = new OrderService(orderRepo, orderMessages, orderMapper, userRepo,
+            paymentMethodRepo, kitchenOrderEventMapper, pricingService); //modificacion para TC-14
     }
 
     //pruebas TC-07
@@ -107,6 +114,28 @@ public class OrderServiceTest {
         verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class)); //modificacion para TC-12
     }
 
+    //TC-14 - La orden no se emite antes de terminar la persistencia
+    @Test
+    public void shouldEmitOrderOnlyAfterSaveCompletes() {
+        TacoOrder order = new TacoOrder();
+        order.setId("ORDER1");
+        MonoProcessor<TacoOrder> saveResult = MonoProcessor.create();
+        when(orderRepo.save(order)).thenReturn(saveResult);
+
+        StepVerifier.create(orderService.saveAndPublish(order))
+            .expectSubscription()
+            .then(() -> {
+                verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class));
+                saveResult.onNext(order);
+            })
+            .expectNext(order)
+            .verifyComplete();
+
+        verify(orderRepo, times(1)).save(order);
+        verify(orderMessages, times(1)).sendOrder(any(KitchenOrderEvent.class));
+    }
+    //Fin TC-14
+
     @Test
     public void shouldRejectUnknownIngredientBeforeSaveOrPublish() {
         TacoCreateRequest taco = new TacoCreateRequest();
@@ -115,7 +144,7 @@ public class OrderServiceTest {
 
         OrderCreateRequest request = new OrderCreateRequest();
         request.setPaymentMethodId("PAYMENT1"); //modificacion para TC-12
-        request.setTacos(Collections.singletonList(taco));
+        request.setItems(Collections.singletonList(item(taco, 1))); //modificacion para TC-14
 
         when(ingredientRepo.findById("MISSING")).thenReturn(Mono.empty());
         User alice = user("alice");
@@ -137,13 +166,14 @@ public class OrderServiceTest {
     @Test
     public void shouldAssignAuthenticatedUserWhenCreatingOrder() {
         User alice = user("alice");
-        Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP);
+        Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
+            new BigDecimal("1.25"), true, 10, 2); //modificacion para TC-14
         TacoCreateRequest taco = new TacoCreateRequest();
         taco.setName("Test taco");
         taco.setIngredientIds(Collections.singletonList("FLTO"));
         OrderCreateRequest request = new OrderCreateRequest();
         request.setPaymentMethodId("PAYMENT1"); //modificacion para TC-12
-        request.setTacos(Collections.singletonList(taco));
+        request.setItems(Collections.singletonList(item(taco, 2))); //modificacion para TC-14
 
         when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
         when(paymentMethodRepo.findById("PAYMENT1")).thenReturn(Mono.just(paymentMethod(alice)));
@@ -152,19 +182,81 @@ public class OrderServiceTest {
             Mono.just(invocation.getArgument(0)));
 
         StepVerifier.create(orderService.createOrder(request, authentication("alice", "ROLE_USER")))
-            .assertNext(order -> assertEquals("alice", order.getUser().getUsername()))
+            .assertNext(order -> {
+                assertEquals("alice", order.getUser().getUsername());
+                assertEquals(new BigDecimal("2.50"), order.getTotal());
+                assertEquals(new BigDecimal("2.50"), order.getItems().get(0).getSubtotal());
+            })
             .verifyComplete();
 
         verify(userRepo).findByUsername("alice");
         verify(orderRepo, times(1)).save(any(TacoOrder.class));
+        ArgumentCaptor<KitchenOrderEvent> eventCaptor =
+            ArgumentCaptor.forClass(KitchenOrderEvent.class);
+        verify(orderMessages).sendOrder(eventCaptor.capture());
+        assertEquals(2, eventCaptor.getValue().getTacos().get(0).getQuantity());
     }
+
+    //TC-14 - Conserva snapshots despues de cambiar el precio del catalogo
+    @Test
+    public void shouldKeepHistoricalPriceAfterCatalogPriceChanges() {
+        User alice = user("alice");
+        Ingredient first = new Ingredient("A", "Ingredient A", Ingredient.Type.WRAP,
+            new BigDecimal("1.25"), true, 10, 2);
+        Ingredient second = new Ingredient("B", "Ingredient B", Ingredient.Type.PROTEIN,
+            new BigDecimal("2.30"), true, 10, 2);
+        TacoCreateRequest taco = new TacoCreateRequest();
+        taco.setName("Historical taco");
+        taco.setIngredientIds(Arrays.asList("A", "B"));
+        OrderCreateRequest request = new OrderCreateRequest();
+        request.setPaymentMethodId("PAYMENT1");
+        request.setItems(Collections.singletonList(item(taco, 2)));
+        AtomicReference<TacoOrder> persisted = new AtomicReference<>();
+
+        when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
+        when(paymentMethodRepo.findById("PAYMENT1")).thenReturn(Mono.just(paymentMethod(alice)));
+        when(ingredientRepo.findById("A")).thenReturn(Mono.just(first));
+        when(ingredientRepo.findById("B")).thenReturn(Mono.just(second));
+        when(orderRepo.save(any(TacoOrder.class))).thenAnswer(invocation -> {
+            TacoOrder order = invocation.getArgument(0);
+            order.setId("ORDER1");
+            persisted.set(order);
+            return Mono.just(order);
+        });
+
+        StepVerifier.create(orderService.createOrder(request, authentication("alice", "ROLE_USER")))
+            .assertNext(order -> {
+                assertEquals(new BigDecimal("3.55"),
+                    order.getItems().get(0).getUnitPriceAtPurchase());
+                assertEquals(new BigDecimal("7.10"), order.getItems().get(0).getSubtotal());
+                assertEquals(new BigDecimal("7.10"), order.getTotal());
+            })
+            .verifyComplete();
+
+        second.setUnitPrice(new BigDecimal("5.00"));
+        when(orderRepo.findByUserUsernameOrderByPlacedAtDesc("alice"))
+            .thenReturn(Flux.just(persisted.get()));
+
+        StepVerifier.create(orderService.findOrders(authentication("alice", "ROLE_USER")))
+            .assertNext(order -> {
+                assertEquals(new BigDecimal("3.55"),
+                    order.getItems().get(0).getUnitPriceAtPurchase());
+                assertEquals(new BigDecimal("7.10"), order.getItems().get(0).getSubtotal());
+                assertEquals(new BigDecimal("7.10"), order.getTotal());
+            })
+            .verifyComplete();
+
+        verify(ingredientRepo, times(1)).findById("A");
+        verify(ingredientRepo, times(1)).findById("B");
+    }
+    //Fin TC-14
 
     //TC-12 - Un pago inexistente o ajeno detiene persistencia y evento
     @Test
     public void shouldRejectMissingPaymentMethodBeforeSaveOrPublish() {
         OrderCreateRequest request = new OrderCreateRequest();
         request.setPaymentMethodId("MISSING");
-        request.setTacos(Collections.emptyList());
+        request.setItems(Collections.emptyList()); //modificacion para TC-14
         when(userRepo.findByUsername("alice")).thenReturn(Mono.just(user("alice")));
         when(paymentMethodRepo.findById("MISSING")).thenReturn(Mono.empty());
 
@@ -182,7 +274,7 @@ public class OrderServiceTest {
     public void shouldRejectAnotherUsersPaymentMethodBeforeSaveOrPublish() {
         OrderCreateRequest request = new OrderCreateRequest();
         request.setPaymentMethodId("PAYMENT-BOB");
-        request.setTacos(Collections.emptyList());
+        request.setItems(Collections.emptyList()); //modificacion para TC-14
         when(userRepo.findByUsername("alice")).thenReturn(Mono.just(user("alice")));
         when(paymentMethodRepo.findById("PAYMENT-BOB"))
             .thenReturn(Mono.just(paymentMethod(user("bob"))));
@@ -258,5 +350,14 @@ public class OrderServiceTest {
         paymentMethod.setId("PAYMENT1");
         return paymentMethod;
     }
+
+    //TC-14 - Construye una linea de entrada para las pruebas de orden
+    private OrderLineCreateRequest item(TacoCreateRequest taco, int quantity) {
+        OrderLineCreateRequest item = new OrderLineCreateRequest();
+        item.setTaco(taco);
+        item.setQuantity(quantity);
+        return item;
+    }
+    //Fin TC-14
     //Fin TC-11
 }

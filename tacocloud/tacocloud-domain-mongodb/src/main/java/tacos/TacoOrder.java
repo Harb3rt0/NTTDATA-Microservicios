@@ -1,6 +1,7 @@
 package tacos;
 
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -38,10 +39,14 @@ public class TacoOrder implements Serializable {
   @ToString.Exclude
   private String paymentMethodId; //modificacion para TC-12
 
-  private List<Taco> tacos = new ArrayList<>();
+  //TC-14 - Lineas e importes calculados por el servidor
+  private List<OrderLine> items = new ArrayList<>();
+  private BigDecimal total = new BigDecimal("0.00");
+  private String currency;
 
-  public void addTaco(Taco design) {
-    this.tacos.add(design);
-}
+  public void addItem(OrderLine item) {
+    this.items.add(item);
+  }
+  //Fin TC-14
 
 }

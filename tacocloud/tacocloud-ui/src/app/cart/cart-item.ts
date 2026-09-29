@@ -8,8 +8,15 @@ export class CartItem {
     this.taco = taco;
   }
 
-  get lineTotal() {
-    return this.quantity * 4.99;
+  //TC-14 - Estimacion visual basada en el catalogo recibido
+  get unitPriceEstimate() {
+    return this.taco.ingredients.reduce((total, ingredient) =>
+      total + Number(ingredient.unitPrice || 0), 0);
   }
+
+  get lineTotal() {
+    return this.quantity * this.unitPriceEstimate;
+  }
+  //Fin TC-14
 
 }

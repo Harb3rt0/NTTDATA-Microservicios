@@ -470,7 +470,8 @@ public class Tc11AuthorizationIntegrationTest {
     return "{\"deliveryName\":\"Lab User\",\"deliveryStreet\":\"Lab Street\","
         + "\"deliveryCity\":\"Lab City\",\"deliveryState\":\"LC\","
         + "\"deliveryZip\":\"12345\",\"paymentMethodId\":\"" + paymentMethodId + "\","
-        + "\"tacos\":[{\"name\":\"Lab taco\",\"ingredientIds\":[\"FLTO\"]}]}";
+        + "\"items\":[{\"taco\":{\"name\":\"Lab taco\","
+        + "\"ingredientIds\":[\"FLTO\"]},\"quantity\":1}]}"; //modificacion para TC-14
   }
   //Fin TC-12
 }
