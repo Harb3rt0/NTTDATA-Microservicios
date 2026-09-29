@@ -69,9 +69,12 @@ public class Tc14OrderPricingIntegrationTest {
   @MockBean
   private OrderMessagingService orderMessages;
 
+  @MockBean
+  private tacos.web.api.InventoryService inventoryService;
+
   @BeforeEach
   public void setUp() {
-    reset(ingredientRepo, userRepo, orderRepo, paymentMethodRepo, orderMessages);
+    reset(ingredientRepo, userRepo, orderRepo, paymentMethodRepo, orderMessages, inventoryService);
   }
 
   @Test
@@ -82,6 +85,11 @@ public class Tc14OrderPricingIntegrationTest {
     when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(new Ingredient(
         "FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
         new BigDecimal("1.25"), true, 10, 2)));
+    when(ingredientRepo.findById("CARN")).thenReturn(Mono.just(new Ingredient(
+        "CARN", "Carnitas", Ingredient.Type.PROTEIN,
+        new BigDecimal("2.50"), true, 10, 2)));
+    when(inventoryService.reserve(any(), any())).thenReturn(Mono.just(new InventoryReservation()));
+    when(inventoryService.confirm(any(), any())).thenReturn(Mono.just(new InventoryReservation()));
     when(orderRepo.save(any(TacoOrder.class))).thenAnswer(invocation -> {
       TacoOrder order = invocation.getArgument(0);
       order.setId("ORDER1");
@@ -98,17 +106,17 @@ public class Tc14OrderPricingIntegrationTest {
     mockMvc.perform(asyncDispatch(result))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.items[0].quantity").value(2))
-        .andExpect(jsonPath("$.items[0].unitPriceAtPurchase").value(1.25))
-        .andExpect(jsonPath("$.items[0].subtotal").value(2.50))
-        .andExpect(jsonPath("$.total").value(2.50))
+        .andExpect(jsonPath("$.items[0].unitPriceAtPurchase").value(3.75))
+        .andExpect(jsonPath("$.items[0].subtotal").value(7.50))
+        .andExpect(jsonPath("$.total").value(7.50))
         .andExpect(jsonPath("$.currency").value("USD"))
         .andExpect(jsonPath("$.paymentMethodId").doesNotExist())
         .andExpect(jsonPath("$.user").doesNotExist());
 
     ArgumentCaptor<TacoOrder> orderCaptor = ArgumentCaptor.forClass(TacoOrder.class);
     verify(orderRepo, times(1)).save(orderCaptor.capture());
-    assertEquals(new BigDecimal("2.50"), orderCaptor.getValue().getTotal());
-    assertEquals(new BigDecimal("1.25"),
+    assertEquals(new BigDecimal("7.50"), orderCaptor.getValue().getTotal());
+    assertEquals(new BigDecimal("3.75"),
         orderCaptor.getValue().getItems().get(0).getUnitPriceAtPurchase());
     verify(orderMessages, times(1)).sendOrder(any(KitchenOrderEvent.class));
   }
@@ -191,7 +199,7 @@ public class Tc14OrderPricingIntegrationTest {
         + "\"deliveryCity\":\"Lab City\",\"deliveryState\":\"LC\","
         + "\"deliveryZip\":\"12345\",\"paymentMethodId\":\"PAYMENT1\","
         + "\"total\":0,\"currency\":\"MXN\",\"items\":[{\"taco\":{"
-        + "\"name\":\"Lab taco\",\"ingredientIds\":[\"FLTO\"]},"
+        + "\"name\":\"Lab taco\",\"ingredientIds\":[\"FLTO\",\"CARN\"]}," //modificacion para TC-18
         + "\"quantity\":" + quantity + fakeTotals + "}]}";
   }
 

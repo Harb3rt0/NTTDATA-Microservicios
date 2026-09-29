@@ -4,17 +4,23 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.TacoOrder;
 import tacos.User;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
+import tacos.api.dto.OrderQuoteRequest;
+import tacos.api.dto.OrderQuoteResponse;
 import tacos.api.dto.OrderUpdateRequest;
 import tacos.api.error.ApiErrorCodes;
 import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.KitchenOrderEventMapper;
 import tacos.api.mapper.OrderMapper;
+import tacos.coupon.CouponApplication;
+import tacos.coupon.CouponService;
 import tacos.data.OrderRepository;
 import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
@@ -29,12 +35,17 @@ public class OrderService {
     private final PaymentMethodRepository paymentMethodRepo;
     private final KitchenOrderEventMapper kitchenOrderEventMapper;
     private final OrderPricingService pricingService;
+    private final CouponService couponService;
+    private final TacoDesignService tacoDesignService;
+    private final InventoryService inventoryService;
 
     //modificacion para TC-08
     //modificacion para TC-14
     public OrderService(OrderRepository repo, OrderMessagingService orderMessages, OrderMapper orderMapper,
             UserRepository userRepo, PaymentMethodRepository paymentMethodRepo,
-            KitchenOrderEventMapper kitchenOrderEventMapper, OrderPricingService pricingService) {
+            KitchenOrderEventMapper kitchenOrderEventMapper, OrderPricingService pricingService,
+            CouponService couponService, TacoDesignService tacoDesignService,
+            InventoryService inventoryService) { //modificacion para TC-16
         this.repo = repo;
         this.orderMessages = orderMessages;
         this.orderMapper = orderMapper;
@@ -42,35 +53,100 @@ public class OrderService {
         this.paymentMethodRepo = paymentMethodRepo; //modificacion para TC-12
         this.kitchenOrderEventMapper = kitchenOrderEventMapper; //modificacion para TC-12
         this.pricingService = pricingService; //modificacion para TC-14
+        this.couponService = couponService;
+        this.tacoDesignService = tacoDesignService;
+        this.inventoryService = inventoryService;
     }
 
     //TC-07 - Una sola suscripcion para guarar y publicar
     public Mono<TacoOrder> saveAndPublish(TacoOrder order) {
         return repo.save(order)
-            .flatMap(savedOrder ->
-                Mono.fromRunnable(() -> orderMessages.sendOrder(
-                    kitchenOrderEventMapper.toEvent(savedOrder))) //modificacion para TC-12
-                .thenReturn(savedOrder)
-            );
+            .flatMap(this::publish); //modificacion para TC-16
     }
     //TC-07 - Fin
 
     //TC-08 - Separar DTOs de entrada, respuesta y persistencia
     public Mono<TacoOrder> createOrder(OrderCreateRequest request, Authentication authentication) {
         //modificacion para TC-11
-        return authenticatedUser(authentication)
+        return Mono.defer(() -> authenticatedUser(authentication)
             .flatMap(user -> ownedPaymentMethod(request.getPaymentMethodId(), user) //modificacion para TC-12
-                .flatMap(paymentMethod -> pricingService.priceItems(request.getItems())
-                    .collectList()
-                    .map(items -> {
-                        TacoOrder order = orderMapper.toEntity(request, items,
-                            pricingService.calculateTotal(items), pricingService.getCurrency());
+                .flatMap(paymentMethod -> priceAndDiscount(request.getItems(), request.getCouponCode())
+                    .map(priced -> {
+                        CouponApplication coupon = priced.getCoupon();
+                        TacoOrder order = orderMapper.toEntity(request, priced.getItems(),
+                            coupon.getSubtotalBeforeDiscount(), coupon.getDiscountAmount(),
+                            coupon.getTotal(), coupon.getCouponCode(), pricingService.getCurrency());
                         order.setUser(user);
                         order.setPaymentMethodId(paymentMethod.getId());
                         return order;
-                    })))
-            .flatMap(this::saveAndPublish);
+                    }))))
+            .flatMap(order -> reserveAndPersist(order, UUID.randomUUID().toString())); //modificacion para TC-16
     }
+
+    //TC-16 - Reserva despues de validar y compensa si falla el guardado
+    private Mono<TacoOrder> reserveAndPersist(TacoOrder order, String reservationKey) {
+        return inventoryService.reserve(reservationKey, order.getItems())
+            .flatMap(reservation -> {
+                order.setInventoryReservationKey(reservationKey);
+                return repo.save(order)
+                    .onErrorResume(error -> inventoryService.release(reservationKey)
+                        .then(Mono.error(error)))
+                    .flatMap(saved -> inventoryService.confirm(reservationKey, saved.getId())
+                        .then(publish(saved)));
+            });
+    }
+    //Fin TC-16
+
+    //TC-16 - Publica solo despues de persistir y conservar la reserva
+    private Mono<TacoOrder> publish(TacoOrder savedOrder) {
+        return Mono.fromRunnable(() -> orderMessages.sendOrder(
+            kitchenOrderEventMapper.toEvent(savedOrder)))
+            .thenReturn(savedOrder);
+    }
+    //Fin TC-16
+
+    //TC-15 - Cotiza sin guardar, publicar ni reservar
+    public Mono<OrderQuoteResponse> quoteOrder(OrderQuoteRequest request, Authentication authentication) {
+        return authenticatedUser(authentication)
+            .then(priceAndDiscount(request.getItems(), request.getCouponCode()))
+            .map(priced -> orderMapper.toQuoteResponse(priced.getItems(),
+                priced.getCoupon().getSubtotalBeforeDiscount(), priced.getCoupon().getDiscountAmount(),
+                priced.getCoupon().getTotal(), priced.getCoupon().getCouponCode(),
+                pricingService.getCurrency()));
+    }
+    //Fin TC-15
+
+    //TC-15 - Reutiliza pricing y cupon en create y quote
+    private Mono<PricedOrder> priceAndDiscount(java.util.List<tacos.api.dto.OrderLineCreateRequest> requests,
+            String couponCode) {
+        return Mono.defer(() -> {
+            pricingService.validateQuantities(requests); //modificacion para TC-18
+            return tacoDesignService.resolveValidateAndPrice(requests).collectList()
+                .map(items -> new PricedOrder(items,
+                    couponService.apply(couponCode, pricingService.calculateTotal(items))));
+        });
+    }
+    //Fin TC-15
+
+    //TC-15 - Contexto economico interno
+    private static class PricedOrder {
+        private final java.util.List<tacos.OrderLine> items;
+        private final CouponApplication coupon;
+
+        PricedOrder(java.util.List<tacos.OrderLine> items, CouponApplication coupon) {
+            this.items = items;
+            this.coupon = coupon;
+        }
+
+        java.util.List<tacos.OrderLine> getItems() {
+            return items;
+        }
+
+        CouponApplication getCoupon() {
+            return coupon;
+        }
+    }
+    //Fin TC-15
 
     public Mono<TacoOrder> updateOrder(String orderId, OrderUpdateRequest request, Authentication authentication) {
         //modificacion para TC-11
@@ -113,7 +189,8 @@ public class OrderService {
     //TC-11 - DELETE con ownership validado en servicio
     public Mono<Void> deleteOrder(String orderId, Authentication authentication) {
         return accessibleOrder(orderId, authentication)
-            .flatMap(order -> repo.deleteById(order.getId()));
+            .flatMap(order -> inventoryService.release(order.getInventoryReservationKey())
+                .then(repo.deleteById(order.getId()))); //modificacion para TC-16
     }
     //Fin TC-11
 

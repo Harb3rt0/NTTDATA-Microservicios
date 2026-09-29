@@ -52,11 +52,17 @@ public class OrderPricingService {
 
     public Flux<OrderLine> priceItems(List<OrderLineCreateRequest> requests) {
         return Flux.defer(() -> {
-            requests.forEach(request -> validateQuantity(
-                request == null ? null : request.getQuantity()));
+            validateQuantities(requests); //modificacion para TC-18
             return Flux.fromIterable(requests).concatMap(this::priceItem);
         });
     }
+
+    //TC-18 - Valida limites independientes antes de resolver ingredientes
+    public void validateQuantities(List<OrderLineCreateRequest> requests) {
+        requests.forEach(request -> validateQuantity(
+            request == null ? null : request.getQuantity()));
+    }
+    //Fin TC-18
 
     public OrderLine priceResolvedTaco(Taco taco, int quantity) {
         validateQuantity(quantity);

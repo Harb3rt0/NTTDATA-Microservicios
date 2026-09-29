@@ -1,6 +1,8 @@
 package tacos;
 
 import java.math.BigDecimal;
+import java.util.EnumSet;
+import java.util.Set;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
@@ -52,6 +54,12 @@ public class Ingredient {
   private Long version;
   //Fin TC-13
 
+  //TC-17 - Metadata dietaria academica del ingrediente
+  private Set<DietaryTag> dietaryTags = EnumSet.noneOf(DietaryTag.class);
+  private Set<Allergen> allergens = EnumSet.noneOf(Allergen.class);
+  private SpiceLevel spiceLevel = SpiceLevel.NONE;
+  //Fin TC-17
+
   public Ingredient(String id, String name, Type type) {
     this(id, name, type, new BigDecimal("0.00"), false, 0, 0);
   }
@@ -69,8 +77,21 @@ public class Ingredient {
   }
   //Fin TC-13
 
+  //TC-17 - Construye un ingrediente con metadata academica
+  public Ingredient(String id, String name, Type type, BigDecimal unitPrice,
+      boolean available, int stockOnHand, int reorderLevel, Set<DietaryTag> dietaryTags,
+      Set<Allergen> allergens, SpiceLevel spiceLevel) {
+    this(id, name, type, unitPrice, available, stockOnHand, reorderLevel);
+    this.dietaryTags = dietaryTags == null || dietaryTags.isEmpty()
+        ? EnumSet.noneOf(DietaryTag.class) : EnumSet.copyOf(dietaryTags);
+    this.allergens = allergens == null || allergens.isEmpty()
+        ? EnumSet.noneOf(Allergen.class) : EnumSet.copyOf(allergens);
+    this.spiceLevel = spiceLevel == null ? SpiceLevel.NONE : spiceLevel;
+  }
+  //Fin TC-17
+
   public enum Type {
-    WRAP, PROTEIN, VEGGIES, CHEESE, SAUCE
+    WRAP, BOWL, PROTEIN, VEGGIES, CHEESE, SAUCE //modificacion para TC-18
   }
 
 }

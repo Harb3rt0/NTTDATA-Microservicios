@@ -41,8 +41,15 @@ public class TacoOrder implements Serializable {
 
   //TC-14 - Lineas e importes calculados por el servidor
   private List<OrderLine> items = new ArrayList<>();
+  //modificacion para TC-15
+  private BigDecimal subtotalBeforeDiscount = new BigDecimal("0.00");
+  private BigDecimal discountAmount = new BigDecimal("0.00");
   private BigDecimal total = new BigDecimal("0.00");
   private String currency;
+  private String couponCode;
+
+  @JsonIgnore
+  private String inventoryReservationKey; //modificacion para TC-16
 
   public void addItem(OrderLine item) {
     this.items.add(item);

@@ -3,6 +3,7 @@ package tacos.web.api;
 import javax.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.Taco;
+import tacos.api.dto.TacoClassificationResponse;
 import tacos.api.error.ApiErrorCodes;
 import tacos.api.error.ResourceNotFoundException;
 import tacos.data.TacoRepository;
@@ -22,9 +24,13 @@ import tacos.data.TacoRepository;
 @RequestMapping(path = "/api/tacos", produces = "application/json")
 public class TacoController {
   private TacoRepository tacoRepo;
+  private final TacoClassificationService classificationService;
 
-  public TacoController(TacoRepository tacoRepo) {
+  @Autowired
+  public TacoController(TacoRepository tacoRepo,
+      TacoClassificationService classificationService) { //modificacion para TC-17
     this.tacoRepo = tacoRepo;
+    this.classificationService = classificationService;
   }
 
   @GetMapping(params="recent")
@@ -44,5 +50,19 @@ public class TacoController {
         .switchIfEmpty(Mono.error(new ResourceNotFoundException(
             ApiErrorCodes.TACO_NOT_FOUND, "Taco was not found.")));
   }
+
+  public TacoController(TacoRepository tacoRepo) {
+    this(tacoRepo, new TacoClassificationService());
+  }
+
+  //TC-17 - Expone clasificacion derivada por el servidor
+  @GetMapping("/{id}/classification")
+  public Mono<TacoClassificationResponse> classification(@PathVariable("id") String id) {
+    return tacoRepo.findById(id)
+        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
+            ApiErrorCodes.TACO_NOT_FOUND, "Taco was not found.")))
+        .map(taco -> classificationService.classify(taco.getIngredients()));
+  }
+  //Fin TC-17
 
 }

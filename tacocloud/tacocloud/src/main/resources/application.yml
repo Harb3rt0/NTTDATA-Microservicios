@@ -19,6 +19,40 @@ tacocloud:
   pricing:
     currency: USD
   # Fin TC-14
+  # TC-15 - Cupones academicos configurados externamente
+  coupons:
+    definitions:
+      - code: SAVE10
+        type: PERCENTAGE
+        value: 10
+        valid-from: "2020-01-01"
+        valid-until: "2099-12-31"
+        minimum-purchase: 5.00
+        maximum-discount: 5.00
+      - code: LESS3
+        type: FIXED
+        value: 3.00
+        valid-from: "2020-01-01"
+        valid-until: "2099-12-31"
+        minimum-purchase: 3.00
+      - code: OLD10
+        type: PERCENTAGE
+        value: 10
+        valid-from: "2020-01-01"
+        valid-until: "2021-12-31"
+      - code: FUTURE10
+        type: PERCENTAGE
+        value: 10
+        valid-from: "2099-01-01"
+        valid-until: "2099-12-31"
+  # Fin TC-15
+  # TC-18 - Reglas divertidas configurables por tipo, nunca por ID
+  taco-rules:
+    hot-requires-type: VEGGIES
+    pair:
+      trigger-type: CHEESE
+      required-type: SAUCE
+  # Fin TC-18
   security:
     allowed-origin: ${TACOCLOUD_ALLOWED_ORIGIN:http://localhost:8080} #modificacion para TC-11
   tc11-demo:

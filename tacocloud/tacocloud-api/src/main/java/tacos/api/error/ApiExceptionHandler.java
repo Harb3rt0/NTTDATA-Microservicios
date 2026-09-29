@@ -28,6 +28,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import tacos.security.UserAlreadyExistsException;
+import tacos.physics.TacoDesignException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -101,6 +102,14 @@ public class ApiExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiProblem> handleBusinessRule(BusinessRuleException ex,
             HttpServletRequest request) {
+        if (ex instanceof TacoDesignException) { //modificacion para TC-18
+            List<ApiViolation> violations = ((TacoDesignException) ex).getViolations().stream()
+                .map(violation -> new ApiViolation(violation.getCode(), violation.getMessage()))
+                .collect(Collectors.toList());
+            return problem(HttpStatus.UNPROCESSABLE_ENTITY,
+                "urn:tacocloud:problem:business-rule", "Business rule violation",
+                ex.getMessage(), ex.getCode(), request, violations);
+        }
         return problem(HttpStatus.UNPROCESSABLE_ENTITY, "urn:tacocloud:problem:business-rule",
             "Business rule violation", ex.getMessage(), ex.getCode(), request, Collections.emptyList());
     }

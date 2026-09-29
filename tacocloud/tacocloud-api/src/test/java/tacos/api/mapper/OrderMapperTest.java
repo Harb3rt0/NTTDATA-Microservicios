@@ -62,7 +62,8 @@ public class OrderMapperTest {
         taco.setIngredients(Arrays.asList(carn));
         OrderLine item = line(taco, 2, "1.25", "2.50");
         TacoOrder order = orderMapper.toEntity(request, Arrays.asList(item),
-            new BigDecimal("2.50"), "USD"); //modificacion para TC-14
+            new BigDecimal("2.50"), BigDecimal.ZERO, new BigDecimal("2.50"),
+            null, "USD"); //modificacion para TC-15
 
         assertEquals("Test User", order.getDeliveryName());
         assertEquals("Test Street", order.getDeliveryStreet());
@@ -193,7 +194,8 @@ public class OrderMapperTest {
         OrderCreateRequest request = objectMapper.readValue(json, OrderCreateRequest.class);
     
         TacoOrder order = orderMapper.toEntity(request, Collections.emptyList(),
-            new BigDecimal("7.50"), "USD"); //modificacion para TC-14
+            new BigDecimal("7.50"), BigDecimal.ZERO, new BigDecimal("7.50"),
+            null, "USD"); //modificacion para TC-15
     
         assertNull(order.getId());
         assertNull(order.getUser());

@@ -32,6 +32,9 @@ public class IngredientMapper {
         response.setType(ingredient.getType());
         response.setUnitPrice(ingredient.getUnitPrice()); //modificacion para TC-13
         response.setAvailable(ingredient.isAvailable());
+        response.setDietaryTags(ingredient.getDietaryTags()); //modificacion para TC-17
+        response.setAllergens(ingredient.getAllergens());
+        response.setSpiceLevel(ingredient.getSpiceLevel());
         return response;
     }
 

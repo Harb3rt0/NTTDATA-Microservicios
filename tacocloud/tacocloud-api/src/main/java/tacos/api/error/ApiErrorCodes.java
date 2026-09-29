@@ -26,6 +26,15 @@ public final class ApiErrorCodes {
     public static final String INVALID_ITEM_QUANTITY = "INVALID_ITEM_QUANTITY";
     public static final String ITEM_QUANTITY_LIMIT_EXCEEDED = "ITEM_QUANTITY_LIMIT_EXCEEDED";
     //Fin TC-14
+    //TC-15 - Codigo externo comun para cupones no aplicables
+    public static final String COUPON_NOT_APPLICABLE = "COUPON_NOT_APPLICABLE";
+    //Fin TC-15
+    //TC-18 - Codigo estable para disenos invalidos
+    public static final String INVALID_TACO_DESIGN = "INVALID_TACO_DESIGN";
+    //Fin TC-18
+    //TC-16 - Error estable de reserva de inventario
+    public static final String INSUFFICIENT_STOCK = "INSUFFICIENT_STOCK";
+    //Fin TC-16
     public static final String EMAIL_ORDER_REQUIRED = "EMAIL_ORDER_REQUIRED";
     public static final String EMAIL_TACOS_REQUIRED = "EMAIL_TACOS_REQUIRED";
     public static final String EMAIL_TACO_INGREDIENTS_REQUIRED = "EMAIL_TACO_INGREDIENTS_REQUIRED";

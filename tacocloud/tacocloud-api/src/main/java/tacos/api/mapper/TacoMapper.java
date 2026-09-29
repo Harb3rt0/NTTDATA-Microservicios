@@ -4,18 +4,28 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import tacos.Ingredient;
 import tacos.Taco;
 import tacos.api.dto.TacoCreateRequest;
 import tacos.api.dto.TacoResponse;
+import tacos.web.api.TacoClassificationService;
 
 @Component 
 public class TacoMapper {
     private final IngredientMapper ingredientMapper;
+    private final TacoClassificationService classificationService;
+
+    @Autowired
+    public TacoMapper(IngredientMapper ingredientMapper,
+            TacoClassificationService classificationService) { //modificacion para TC-17
+        this.ingredientMapper = ingredientMapper;
+        this.classificationService = classificationService;
+    }
 
     public TacoMapper(IngredientMapper ingredientMapper) {
-        this.ingredientMapper = ingredientMapper;
+        this(ingredientMapper, new TacoClassificationService());
     }
 
     public Taco toEntity(TacoCreateRequest request, List<Ingredient> ingredients) {
@@ -32,6 +42,7 @@ public class TacoMapper {
             .map(ingredientMapper::toResponse)
             .collect(Collectors.toList())
         );
+        response.setClassification(classificationService.classify(taco.getIngredients()));
 
         return response;
     }

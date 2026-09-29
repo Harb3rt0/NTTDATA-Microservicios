@@ -9,4 +9,5 @@ import lombok.Data;
 public class TacoResponse {
     private String name;
     private List<IngredientResponse> ingredients = new ArrayList<>();
+    private TacoClassificationResponse classification; //modificacion para TC-17
 }

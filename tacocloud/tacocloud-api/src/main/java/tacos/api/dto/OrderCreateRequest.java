@@ -39,6 +39,11 @@ public class OrderCreateRequest {   //modificacion para TC-09
     @Size(max = 64, message = "Payment method identifier must not exceed 64 characters")
     private String paymentMethodId; //modificacion para TC-12
 
+    //TC-15 - Cupon unico opcional
+    @Size(max = 40, message = "Coupon code must not exceed 40 characters")
+    private String couponCode;
+    //Fin TC-15
+
     @Valid
     //modificacion para TC-14
     @NotEmpty(message = "At least one item is required")

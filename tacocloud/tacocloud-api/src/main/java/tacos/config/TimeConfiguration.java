@@ -1,0 +1,16 @@
+package tacos.config;
+
+import java.time.Clock;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+//TC-15 - Reloj reemplazable para reglas con vigencia
+@Configuration
+public class TimeConfiguration {
+    @Bean
+    public Clock clock() {
+        return Clock.systemDefaultZone();
+    }
+}
+//Fin TC-15

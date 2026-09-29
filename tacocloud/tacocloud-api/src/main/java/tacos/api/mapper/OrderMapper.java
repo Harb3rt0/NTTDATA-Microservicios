@@ -11,6 +11,7 @@ import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderLineResponse;
 import tacos.api.dto.OrderPatchRequest;
+import tacos.api.dto.OrderQuoteResponse;
 import tacos.api.dto.OrderResponse;
 import tacos.api.dto.OrderUpdateRequest;
 
@@ -23,7 +24,8 @@ public class OrderMapper {
     }
 
     public TacoOrder toEntity(OrderCreateRequest request, List<OrderLine> items,
-            BigDecimal total, String currency) { //modificacion para TC-14
+            BigDecimal subtotal, BigDecimal discount, BigDecimal total,
+            String couponCode, String currency) { //modificacion para TC-15
         TacoOrder order = new TacoOrder();
         order.setDeliveryName(request.getDeliveryName());
         order.setDeliveryStreet(request.getDeliveryStreet());
@@ -32,8 +34,11 @@ public class OrderMapper {
         order.setDeliveryZip(request.getDeliveryZip());
         order.setPaymentMethodId(request.getPaymentMethodId()); //modificacion para TC-12
         order.setItems(items); //modificacion para TC-14
+        order.setSubtotalBeforeDiscount(subtotal);
+        order.setDiscountAmount(discount);
         order.setTotal(total);
         order.setCurrency(currency);
+        order.setCouponCode(couponCode);
         return order;
     }
 
@@ -84,11 +89,28 @@ public class OrderMapper {
             .map(this::toLineResponse)
             .collect(Collectors.toList())
         ); //modificacion para TC-14
+        response.setSubtotalBeforeDiscount(order.getSubtotalBeforeDiscount()); //modificacion para TC-15
+        response.setDiscountAmount(order.getDiscountAmount());
         response.setTotal(order.getTotal());
         response.setCurrency(order.getCurrency());
+        response.setCouponCode(order.getCouponCode());
 
         return response;
     }
+
+    //TC-15 - Mapea una cotizacion sin entidad persistida
+    public OrderQuoteResponse toQuoteResponse(List<OrderLine> items, BigDecimal subtotal,
+            BigDecimal discount, BigDecimal total, String couponCode, String currency) {
+        OrderQuoteResponse response = new OrderQuoteResponse();
+        response.setItems(items.stream().map(this::toLineResponse).collect(Collectors.toList()));
+        response.setSubtotalBeforeDiscount(subtotal);
+        response.setDiscountAmount(discount);
+        response.setTotal(total);
+        response.setCouponCode(couponCode);
+        response.setCurrency(currency);
+        return response;
+    }
+    //Fin TC-15
 
     //TC-14 - Mapea el snapshot persistido sin recalcular precios
     private OrderLineResponse toLineResponse(OrderLine item) {

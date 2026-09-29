@@ -67,6 +67,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         .antMatchers("/api/admin/**").hasRole("ADMIN") //modificacion para TC-12
         .antMatchers("/api/payment-methods/**").hasAnyRole("USER", "ADMIN") //modificacion para TC-12
         .antMatchers("/api/orders/**").hasAnyRole("USER", "ADMIN")
+        .antMatchers(HttpMethod.POST, "/api/tacos/validate").hasAnyRole("USER", "ADMIN") //modificacion para TC-18
         .antMatchers(HttpMethod.POST, "/api/tacos").hasAnyRole("USER", "ADMIN")
         .anyRequest().denyAll()
         

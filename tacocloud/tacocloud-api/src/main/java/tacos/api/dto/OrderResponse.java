@@ -18,7 +18,11 @@ public class OrderResponse {
     private String deliveryZip;
     //TC-14 - Totales y lineas seguras de la orden
     private List<OrderLineResponse> items = new ArrayList<>();
+    //modificacion para TC-15
+    private BigDecimal subtotalBeforeDiscount;
+    private BigDecimal discountAmount;
     private BigDecimal total;
     private String currency;
+    private String couponCode;
     //Fin TC-14
 }

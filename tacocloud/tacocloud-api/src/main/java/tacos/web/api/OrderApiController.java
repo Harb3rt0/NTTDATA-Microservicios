@@ -24,6 +24,8 @@ import reactor.core.publisher.Mono;
 import tacos.TacoOrder;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
+import tacos.api.dto.OrderQuoteRequest;
+import tacos.api.dto.OrderQuoteResponse;
 import tacos.api.dto.OrderResponse;
 import tacos.api.dto.OrderUpdateRequest;
 import tacos.api.mapper.OrderMapper;
@@ -68,6 +70,14 @@ public class OrderApiController {
       .map(orderMapper::toResponse);
   }
   //TC-08 - Fin
+
+  //TC-15 - Cotizacion autenticada sin efectos externos
+  @PostMapping(path = "/quote", consumes = "application/json")
+  public Mono<OrderQuoteResponse> quoteOrder(@Valid @RequestBody OrderQuoteRequest request,
+      Authentication authentication) {
+    return orderService.quoteOrder(request, authentication);
+  }
+  //Fin TC-15
 
   //TC-06 - Convertir ordenes de correo sin carreras ni nulls sorpresa
   @PostMapping(path = "fromEmail", consumes = "application/json")

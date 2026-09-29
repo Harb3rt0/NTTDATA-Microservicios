@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -18,8 +18,8 @@ public class TacoCreateRequest {    //modificacion para TC-09
     @Size(max = 50, message = "Taco name must not exceed 50 characters")
     private String name;
 
-    @NotEmpty(message = "A taco must contain at least one ingredient")
-    @Size(max = 10, message = "A taco cannot contain more than 10 ingredients")
+    @NotNull(message = "Ingredient ids are required")
+    @Size(max = 12, message = "A taco cannot contain more than 12 ingredients") //modificacion para TC-18
     private List<
         @NotBlank(message = "Ingredient id cannot be blank")
         @Size(max = 20, message = "Ingredient id must not exceed 20 characters")

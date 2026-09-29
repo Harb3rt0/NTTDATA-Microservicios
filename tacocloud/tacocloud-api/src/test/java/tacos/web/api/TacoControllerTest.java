@@ -78,6 +78,32 @@ public class TacoControllerTest {
         .isEqualTo(savedTaco);
   }
 
+  //TC-17 - Endpoint expone clasificacion derivada
+  @Test
+  public void shouldExposeDerivedClassification() {
+    Taco taco = testTaco(1L);
+    taco.getIngredients().get(0).setDietaryTags(
+        java.util.EnumSet.of(tacos.DietaryTag.VEGAN, tacos.DietaryTag.VEGETARIAN));
+    taco.getIngredients().get(1).setDietaryTags(
+        java.util.EnumSet.of(tacos.DietaryTag.GLUTEN_FREE));
+    taco.getIngredients().get(1).setAllergens(
+        java.util.EnumSet.of(tacos.Allergen.DAIRY));
+    taco.getIngredients().get(1).setSpiceLevel(tacos.SpiceLevel.HOT);
+    TacoRepository tacoRepo = Mockito.mock(TacoRepository.class);
+    when(tacoRepo.findById("1")).thenReturn(Mono.just(taco));
+
+    WebTestClient.bindToController(new TacoController(tacoRepo)).build()
+      .get().uri("/api/tacos/1/classification")
+      .exchange()
+      .expectStatus().isOk()
+      .expectBody()
+        .jsonPath("$.dietaryTags").isArray()
+        .jsonPath("$.allergens[0]").isEqualTo("DAIRY")
+        .jsonPath("$.spiceLevel").isEqualTo("HOT")
+        .jsonPath("$.disclaimer").exists();
+  }
+  //Fin TC-17
+
   private Taco testTaco(Long number) {
     Taco taco = new Taco();
     taco.setId(number != null ? number.toString(): "TESTID");

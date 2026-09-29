@@ -13,6 +13,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,11 +31,14 @@ import reactor.core.publisher.MonoProcessor;
 import reactor.test.StepVerifier;
 import tacos.Ingredient;
 import tacos.PaymentMethod;
+import tacos.InventoryReservation;
+import tacos.ReservationStatus;
 import tacos.TacoOrder;
 import tacos.User;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderLineCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
+import tacos.api.dto.OrderQuoteRequest;
 import tacos.api.dto.TacoCreateRequest;
 import tacos.api.error.ApiErrorCodes;
 import tacos.api.error.BusinessRuleException;
@@ -41,12 +47,22 @@ import tacos.api.mapper.IngredientMapper;
 import tacos.api.mapper.KitchenOrderEventMapper;
 import tacos.api.mapper.OrderMapper;
 import tacos.api.mapper.TacoMapper;
+import tacos.coupon.CouponProperties;
+import tacos.coupon.CouponService;
 import tacos.data.IngredientRepository;
 import tacos.data.OrderRepository;
 import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.KitchenOrderEvent;
 import tacos.messaging.OrderMessagingService;
+import tacos.physics.AvailabilityRule;
+import tacos.physics.BaseCountRule;
+import tacos.physics.DuplicateIngredientRule;
+import tacos.physics.HotRequiresTypeRule;
+import tacos.physics.IngredientCountRule;
+import tacos.physics.TacoDesignValidator;
+import tacos.physics.TacoDesignException;
+import tacos.physics.TypePairRule;
 
 public class OrderServiceTest {
     private OrderRepository orderRepo;
@@ -60,6 +76,7 @@ public class OrderServiceTest {
     private KitchenOrderEventMapper kitchenOrderEventMapper;
     private OrderPricingService pricingService;
     private OrderService orderService;
+    private InventoryService inventoryService;
 
     @BeforeEach
     public void setUp() {
@@ -73,9 +90,30 @@ public class OrderServiceTest {
         orderMapper = new OrderMapper(tacoMapper);
         kitchenOrderEventMapper = new KitchenOrderEventMapper();
         pricingService = new OrderPricingService(ingredientRepo, tacoMapper, 10, "USD");
+        inventoryService = Mockito.mock(InventoryService.class);
+        CouponService couponService = new CouponService(new CouponProperties(),
+            Clock.fixed(Instant.parse("2026-01-15T00:00:00Z"), ZoneOffset.UTC));
+        TacoDesignValidator validator = new TacoDesignValidator(Arrays.asList(
+            new BaseCountRule(), new IngredientCountRule(), new DuplicateIngredientRule(),
+            new AvailabilityRule(), new HotRequiresTypeRule(Ingredient.Type.VEGGIES),
+            new TypePairRule(Ingredient.Type.CHEESE, Ingredient.Type.SAUCE)));
+        TacoDesignService tacoDesignService = new TacoDesignService(ingredientRepo, tacoMapper,
+            validator, new TacoClassificationService(), pricingService);
+        when(inventoryService.reserve(any(String.class), any(java.util.List.class)))
+            .thenAnswer(invocation -> {
+                InventoryReservation reservation = new InventoryReservation();
+                reservation.setId(invocation.getArgument(0));
+                reservation.setReservationKey(invocation.getArgument(0));
+                reservation.setStatus(ReservationStatus.ACTIVE);
+                return Mono.just(reservation);
+            });
+        when(inventoryService.confirm(any(String.class), any()))
+            .thenAnswer(invocation -> Mono.just(new InventoryReservation()));
+        when(inventoryService.release(Mockito.nullable(String.class))).thenReturn(Mono.empty());
         
         orderService = new OrderService(orderRepo, orderMessages, orderMapper, userRepo,
-            paymentMethodRepo, kitchenOrderEventMapper, pricingService); //modificacion para TC-14
+            paymentMethodRepo, kitchenOrderEventMapper, pricingService,
+            couponService, tacoDesignService, inventoryService); //modificacion para TC-16
     }
 
     //pruebas TC-07
@@ -159,6 +197,7 @@ public class OrderServiceTest {
 
         verify(orderRepo, never()).save(any(TacoOrder.class));
         verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class)); //modificacion para TC-12
+        verify(inventoryService, never()).reserve(any(String.class), any(java.util.List.class));
     }
     //final de pruebas TC-07
 
@@ -170,7 +209,7 @@ public class OrderServiceTest {
             new BigDecimal("1.25"), true, 10, 2); //modificacion para TC-14
         TacoCreateRequest taco = new TacoCreateRequest();
         taco.setName("Test taco");
-        taco.setIngredientIds(Collections.singletonList("FLTO"));
+        taco.setIngredientIds(Arrays.asList("FLTO", "LETC")); //modificacion para TC-18
         OrderCreateRequest request = new OrderCreateRequest();
         request.setPaymentMethodId("PAYMENT1"); //modificacion para TC-12
         request.setItems(Collections.singletonList(item(taco, 2))); //modificacion para TC-14
@@ -178,14 +217,16 @@ public class OrderServiceTest {
         when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
         when(paymentMethodRepo.findById("PAYMENT1")).thenReturn(Mono.just(paymentMethod(alice)));
         when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(ingredient));
+        when(ingredientRepo.findById("LETC")).thenReturn(Mono.just(new Ingredient(
+            "LETC", "Lettuce", Ingredient.Type.VEGGIES, new BigDecimal("0.65"), true, 10, 2)));
         when(orderRepo.save(any(TacoOrder.class))).thenAnswer(invocation ->
             Mono.just(invocation.getArgument(0)));
 
         StepVerifier.create(orderService.createOrder(request, authentication("alice", "ROLE_USER")))
             .assertNext(order -> {
                 assertEquals("alice", order.getUser().getUsername());
-                assertEquals(new BigDecimal("2.50"), order.getTotal());
-                assertEquals(new BigDecimal("2.50"), order.getItems().get(0).getSubtotal());
+                assertEquals(new BigDecimal("3.80"), order.getTotal());
+                assertEquals(new BigDecimal("3.80"), order.getItems().get(0).getSubtotal());
             })
             .verifyComplete();
 
@@ -196,6 +237,106 @@ public class OrderServiceTest {
         verify(orderMessages).sendOrder(eventCaptor.capture());
         assertEquals(2, eventCaptor.getValue().getTacos().get(0).getQuantity());
     }
+
+    //TC-15 - Quote calcula sin persistir ni publicar
+    @Test
+    public void shouldQuoteWithoutSavingOrder() {
+        User alice = user("alice");
+        Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
+            new BigDecimal("1.25"), true, 10, 2);
+        TacoCreateRequest taco = new TacoCreateRequest();
+        taco.setName("Quote taco");
+        taco.setIngredientIds(Arrays.asList("FLTO", "LETC")); //modificacion para TC-18
+        OrderQuoteRequest request = new OrderQuoteRequest();
+        request.setItems(Collections.singletonList(item(taco, 2)));
+        when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
+        when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(ingredient));
+        when(ingredientRepo.findById("LETC")).thenReturn(Mono.just(new Ingredient(
+            "LETC", "Lettuce", Ingredient.Type.VEGGIES, new BigDecimal("0.65"), true, 10, 2)));
+
+        StepVerifier.create(orderService.quoteOrder(request, authentication("alice", "ROLE_USER")))
+            .assertNext(quote -> {
+                assertEquals(new BigDecimal("3.80"), quote.getSubtotalBeforeDiscount());
+                assertEquals(new BigDecimal("0.00"), quote.getDiscountAmount());
+                assertEquals(new BigDecimal("3.80"), quote.getTotal());
+            })
+            .verifyComplete();
+
+        verify(orderRepo, never()).save(any(TacoOrder.class));
+        verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class));
+        verify(paymentMethodRepo, never()).findById(any(String.class));
+        verify(inventoryService, never()).reserve(any(String.class), any(java.util.List.class));
+    }
+    //Fin TC-15
+
+    //TC-18 - Quote y create usan las mismas reglas antes de reservar
+    @Test
+    public void shouldUseSameRulesForQuoteAndCreateBeforeInventoryReservation() {
+        User alice = user("alice");
+        Ingredient flour = new Ingredient("FLTO", "Flour", Ingredient.Type.WRAP,
+            BigDecimal.ONE, true, 10, 2);
+        Ingredient corn = new Ingredient("COTO", "Corn", Ingredient.Type.WRAP,
+            BigDecimal.ONE, true, 10, 2);
+        TacoCreateRequest taco = new TacoCreateRequest();
+        taco.setName("Invalid bases");
+        taco.setIngredientIds(Arrays.asList("FLTO", "COTO"));
+        OrderQuoteRequest quote = new OrderQuoteRequest();
+        quote.setItems(Collections.singletonList(item(taco, 1)));
+        OrderCreateRequest create = new OrderCreateRequest();
+        create.setPaymentMethodId("PAYMENT1");
+        create.setItems(Collections.singletonList(item(taco, 1)));
+        when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
+        when(paymentMethodRepo.findById("PAYMENT1")).thenReturn(Mono.just(paymentMethod(alice)));
+        when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(flour));
+        when(ingredientRepo.findById("COTO")).thenReturn(Mono.just(corn));
+
+        StepVerifier.create(orderService.quoteOrder(quote, authentication("alice", "ROLE_USER")))
+            .expectErrorMatches(error -> error instanceof TacoDesignException
+                && ((TacoDesignException) error).getViolations().stream()
+                    .anyMatch(v -> "INVALID_BASE_COUNT".equals(v.getCode())))
+            .verify();
+        StepVerifier.create(orderService.createOrder(create, authentication("alice", "ROLE_USER")))
+            .expectErrorMatches(error -> error instanceof TacoDesignException
+                && ((TacoDesignException) error).getViolations().stream()
+                    .anyMatch(v -> "INVALID_BASE_COUNT".equals(v.getCode())))
+            .verify();
+
+        verify(inventoryService, never()).reserve(any(String.class), any(java.util.List.class));
+        verify(orderRepo, never()).save(any(TacoOrder.class));
+    }
+    //Fin TC-18
+
+    //TC-16 - Un fallo de persistencia libera la reserva exactamente una vez
+    @Test
+    public void shouldReleaseReservationWhenOrderFailsBeforePersistence() {
+        User alice = user("alice");
+        Ingredient flour = new Ingredient("FLTO", "Flour", Ingredient.Type.WRAP,
+            BigDecimal.ONE, true, 10, 2);
+        Ingredient lettuce = new Ingredient("LETC", "Lettuce", Ingredient.Type.VEGGIES,
+            BigDecimal.ONE, true, 10, 2);
+        TacoCreateRequest taco = new TacoCreateRequest();
+        taco.setName("Valid taco");
+        taco.setIngredientIds(Arrays.asList("FLTO", "LETC"));
+        OrderCreateRequest request = new OrderCreateRequest();
+        request.setPaymentMethodId("PAYMENT1");
+        request.setItems(Collections.singletonList(item(taco, 1)));
+        when(userRepo.findByUsername("alice")).thenReturn(Mono.just(alice));
+        when(paymentMethodRepo.findById("PAYMENT1")).thenReturn(Mono.just(paymentMethod(alice)));
+        when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(flour));
+        when(ingredientRepo.findById("LETC")).thenReturn(Mono.just(lettuce));
+        when(orderRepo.save(any(TacoOrder.class))).thenReturn(Mono.error(new RuntimeException("save failed")));
+
+        StepVerifier.create(orderService.createOrder(request, authentication("alice", "ROLE_USER")))
+            .expectErrorMessage("save failed")
+            .verify();
+
+        ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+        verify(inventoryService, times(1)).reserve(key.capture(), any(java.util.List.class));
+        verify(inventoryService, times(1)).release(key.getValue());
+        verify(inventoryService, never()).confirm(any(String.class), any());
+        verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class));
+    }
+    //Fin TC-16
 
     //TC-14 - Conserva snapshots despues de cambiar el precio del catalogo
     @Test
