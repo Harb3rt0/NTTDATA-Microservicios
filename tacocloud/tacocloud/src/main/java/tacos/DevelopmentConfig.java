@@ -1,5 +1,6 @@
 package tacos;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 
 import org.springframework.boot.CommandLineRunner;
@@ -24,16 +25,16 @@ public class DevelopmentConfig {
     return new CommandLineRunner() {
       @Override
       public void run(String... args) throws Exception {
-        Ingredient flourTortilla = saveAnIngredient("FLTO", "Flour Tortilla", Type.WRAP);
-        Ingredient cornTortilla = saveAnIngredient("COTO", "Corn Tortilla", Type.WRAP);
-        Ingredient groundBeef = saveAnIngredient("GRBF", "Ground Beef", Type.PROTEIN);
-        Ingredient carnitas = saveAnIngredient("CARN", "Carnitas", Type.PROTEIN);
-        Ingredient tomatoes = saveAnIngredient("TMTO", "Diced Tomatoes", Type.VEGGIES);
-        Ingredient lettuce = saveAnIngredient("LETC", "Lettuce", Type.VEGGIES);
-        Ingredient cheddar = saveAnIngredient("CHED", "Cheddar", Type.CHEESE);
-        Ingredient jack = saveAnIngredient("JACK", "Monterrey Jack", Type.CHEESE);
-        Ingredient salsa = saveAnIngredient("SLSA", "Salsa", Type.SAUCE);
-        Ingredient sourCream = saveAnIngredient("SRCR", "Sour Cream", Type.SAUCE);
+        Ingredient flourTortilla = saveAnIngredient("FLTO", "Flour Tortilla", Type.WRAP, "1.25");
+        Ingredient cornTortilla = saveAnIngredient("COTO", "Corn Tortilla", Type.WRAP, "1.10");
+        Ingredient groundBeef = saveAnIngredient("GRBF", "Ground Beef", Type.PROTEIN, "2.35");
+        Ingredient carnitas = saveAnIngredient("CARN", "Carnitas", Type.PROTEIN, "2.50");
+        Ingredient tomatoes = saveAnIngredient("TMTO", "Diced Tomatoes", Type.VEGGIES, "0.75");
+        Ingredient lettuce = saveAnIngredient("LETC", "Lettuce", Type.VEGGIES, "0.65");
+        Ingredient cheddar = saveAnIngredient("CHED", "Cheddar", Type.CHEESE, "1.20");
+        Ingredient jack = saveAnIngredient("JACK", "Monterrey Jack", Type.CHEESE, "1.30");
+        Ingredient salsa = saveAnIngredient("SLSA", "Salsa", Type.SAUCE, "0.80");
+        Ingredient sourCream = saveAnIngredient("SRCR", "Sour Cream", Type.SAUCE, "0.95");
         
 //        UserUDT u = new UserUDT(username, fullname, phoneNumber)
         
@@ -63,8 +64,9 @@ public class DevelopmentConfig {
 
       }
 
-      private Ingredient saveAnIngredient(String id, String name, Type type) {
-        Ingredient ingredient = new Ingredient(id, name, type);
+      private Ingredient saveAnIngredient(String id, String name, Type type, String unitPrice) {
+        Ingredient ingredient = new Ingredient(id, name, type, new BigDecimal(unitPrice),
+            true, 100, 20); //modificacion para TC-13
         repo.save(ingredient).subscribe();
         return ingredient;
       }

@@ -37,12 +37,15 @@ import tacos.data.IngredientRepository;
 public class IngredientController {
 
   private final IngredientMapper ingredientMapper;
+  private final IngredientCatalogService ingredientCatalogService; //modificacion para TC-13
   private IngredientRepository repo;
 
   @Autowired
-  public IngredientController(IngredientRepository repo, IngredientMapper ingredientMapper) {
+  public IngredientController(IngredientRepository repo, IngredientMapper ingredientMapper,
+      IngredientCatalogService ingredientCatalogService) {
     this.repo = repo;
     this.ingredientMapper = ingredientMapper;
+    this.ingredientCatalogService = ingredientCatalogService; //modificacion para TC-13
   }
 
   //TC-08
@@ -69,18 +72,15 @@ public class IngredientController {
 
   //TC-01 - Actualizar un ingrediente sin perder el publisher
   @PutMapping("/{id}")
-  public Mono<ResponseEntity<Ingredient>> updateIngredient(
+  public Mono<ResponseEntity<IngredientResponse>> updateIngredient(
       @PathVariable @NotBlank @Size(max = 20) String id,
-      @Valid @RequestBody Ingredient ingredient) {
-    if (ingredient.getId() != null && !ingredient.getId().equals(id)) { //modificacion TC-09
+      @Valid @RequestBody IngredientRequest request) {
+    if (request.getId() != null && !request.getId().equals(id)) { //modificacion para TC-13
       throw new BadRequestException(ApiErrorCodes.INGREDIENT_ID_MISMATCH,
           "The ingredient id does not match the path id.");
     }
-    ingredient.setId(id);
-    return repo.findById(id)
-        .switchIfEmpty(Mono.error(new ResourceNotFoundException(
-            ApiErrorCodes.INGREDIENT_NOT_FOUND, "Ingredient was not found.")))
-        .flatMap(updatedIngredient -> repo.save(ingredient))
+    return ingredientCatalogService.replace(id, request) //modificacion para TC-13
+        .map(ingredientMapper::toResponse)
         .map(ResponseEntity::ok);
   }
   //TC-01 - Fin
@@ -100,8 +100,7 @@ public class IngredientController {
   //modificacion para TC-08
   @PostMapping
   public Mono<ResponseEntity<IngredientResponse>> postIngredient(@Valid @RequestBody IngredientRequest request, ServerHttpRequest httpRequest) {
-    Ingredient ingredient = ingredientMapper.toEntity(request);
-    return repo.save(ingredient).map(saved -> {
+    return ingredientCatalogService.create(request).map(saved -> { //modificacion para TC-13
       URI location = UriComponentsBuilder.fromHttpRequest(httpRequest)
         .path("/{id}")
         .buildAndExpand(saved.getId()).toUri();

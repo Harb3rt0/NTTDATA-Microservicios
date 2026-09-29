@@ -1,10 +1,13 @@
 package tacos;
 
+import java.math.BigDecimal;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -25,6 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -68,13 +72,22 @@ public class Tc11AuthorizationIntegrationTest {
   //TC-11 - Matriz HTTP deny-by-default y errores ApiProblem
   @Test
   public void shouldKeepIngredientCatalogPublic() throws Exception {
-    when(ingredientRepo.findAll()).thenReturn(Flux.empty());
+    Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
+        new BigDecimal("1.25"), true, 10, 2); //modificacion para TC-13
+    ingredient.setVersion(3L);
+    when(ingredientRepo.findAll()).thenReturn(Flux.just(ingredient));
 
     MvcResult result = mockMvc.perform(get("/api/ingredients"))
         .andExpect(request().asyncStarted())
         .andReturn();
 
-    mockMvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].unitPrice").value(1.25))
+        .andExpect(jsonPath("$[0].available").value(true))
+        .andExpect(jsonPath("$[0].stockOnHand").doesNotExist())
+        .andExpect(jsonPath("$[0].reorderLevel").doesNotExist())
+        .andExpect(jsonPath("$[0].version").doesNotExist()); //modificacion para TC-13
   }
 
   @Test
@@ -138,7 +151,8 @@ public class Tc11AuthorizationIntegrationTest {
 
   @Test
   public void shouldRejectUserAndKitchenIngredientAdministrationWithApiProblem() throws Exception {
-    String ingredient = "{\"id\":\"FLTO\",\"name\":\"Flour Tortilla\",\"type\":\"WRAP\"}";
+    String ingredient = "{\"id\":\"FLTO\",\"name\":\"Flour Tortilla\",\"type\":\"WRAP\","
+        + "\"unitPrice\":1.25,\"available\":true,\"stockOnHand\":10,\"reorderLevel\":2}";
 
     mockMvc.perform(put("/api/ingredients/FLTO").with(user("alice").roles("USER"))
             .contentType(MediaType.APPLICATION_JSON).content(ingredient))
@@ -162,7 +176,9 @@ public class Tc11AuthorizationIntegrationTest {
     MvcResult result = mockMvc.perform(put("/api/ingredients/FLTO")
             .with(user("admin").roles("ADMIN"))
             .contentType(MediaType.APPLICATION_JSON)
-            .content("{\"id\":\"FLTO\",\"name\":\"Updated Tortilla\",\"type\":\"WRAP\"}"))
+            .content("{\"id\":\"FLTO\",\"name\":\"Updated Tortilla\",\"type\":\"WRAP\","
+                + "\"unitPrice\":1.25,\"available\":true,\"stockOnHand\":10,"
+                + "\"reorderLevel\":2}")) //modificacion para TC-13
         .andExpect(request().asyncStarted())
         .andReturn();
 
@@ -170,6 +186,122 @@ public class Tc11AuthorizationIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.name").value("Updated Tortilla"));
   }
+
+  //TC-13 - Seguridad y contrato de las operaciones administrativas
+  @Test
+  public void shouldAllowOnlyAdminToUpdateIngredientCatalog() throws Exception {
+    String catalogUpdate = "{\"unitPrice\":2.355,\"available\":false,\"reorderLevel\":3}";
+
+    mockMvc.perform(patch("/api/admin/ingredients/FLTO/catalog")
+            .contentType(MediaType.APPLICATION_JSON).content(catalogUpdate))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+    mockMvc.perform(patch("/api/admin/ingredients/FLTO/catalog")
+            .with(user("alice").roles("USER"))
+            .contentType(MediaType.APPLICATION_JSON).content(catalogUpdate))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+    Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
+        new BigDecimal("1.25"), true, 10, 2);
+    ingredient.setVersion(4L);
+    when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(ingredient));
+    when(ingredientRepo.save(any(Ingredient.class))).thenAnswer(invocation ->
+        Mono.just(invocation.<Ingredient>getArgument(0)));
+
+    MvcResult result = mockMvc.perform(patch("/api/admin/ingredients/FLTO/catalog")
+            .with(user("admin-test").roles("ADMIN"))
+            .contentType(MediaType.APPLICATION_JSON).content(catalogUpdate))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value("FLTO"))
+        .andExpect(jsonPath("$.unitPrice").value(2.36))
+        .andExpect(jsonPath("$.available").value(false))
+        .andExpect(jsonPath("$.stockOnHand").value(10))
+        .andExpect(jsonPath("$.reorderLevel").value(3))
+        .andExpect(jsonPath("$.version").value(4));
+  }
+
+  @Test
+  public void shouldRejectNegativeStockAdjustmentWithApiProblem() throws Exception {
+    Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
+        new BigDecimal("1.25"), true, 5, 2);
+    when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(ingredient));
+
+    MvcResult result = mockMvc.perform(post("/api/admin/ingredients/FLTO/stock-adjustments")
+            .with(user("admin-test").roles("ADMIN"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"adjustment\":-6}"))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isUnprocessableEntity())
+        .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+        .andExpect(jsonPath("$.status").value(422))
+        .andExpect(jsonPath("$.code").value("NEGATIVE_STOCK_NOT_ALLOWED"));
+
+    verify(ingredientRepo, never()).save(any(Ingredient.class));
+  }
+
+  @Test
+  public void shouldRejectInvalidCatalogValuesBeforePersistence() throws Exception {
+    mockMvc.perform(patch("/api/admin/ingredients/FLTO/catalog")
+            .with(user("admin-test").roles("ADMIN"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"unitPrice\":-0.01,\"reorderLevel\":-1}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+        .andExpect(jsonPath("$.violations").isArray());
+
+    verifyNoInteractions(ingredientRepo);
+  }
+
+  @Test
+  public void shouldTranslateStaleCatalogUpdateToConflict() throws Exception {
+    Ingredient ingredient = new Ingredient("FLTO", "Flour Tortilla", Ingredient.Type.WRAP,
+        new BigDecimal("1.25"), true, 5, 2);
+    ingredient.setVersion(3L);
+    when(ingredientRepo.findById("FLTO")).thenReturn(Mono.just(ingredient));
+    when(ingredientRepo.save(ingredient)).thenReturn(Mono.error(
+        new OptimisticLockingFailureException("Stale ingredient version")));
+
+    MvcResult result = mockMvc.perform(patch("/api/admin/ingredients/FLTO/catalog")
+            .with(user("admin-test").roles("ADMIN"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"unitPrice\":1.50}"))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isConflict())
+        .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+        .andExpect(jsonPath("$.status").value(409))
+        .andExpect(jsonPath("$.code").value("OPTIMISTIC_LOCK_CONFLICT"));
+  }
+
+  @Test
+  public void shouldReturnNotFoundForUnknownIngredientStockAdjustment() throws Exception {
+    when(ingredientRepo.findById("TC13-NOT-FOUND")).thenReturn(Mono.empty());
+
+    MvcResult result = mockMvc.perform(post(
+            "/api/admin/ingredients/TC13-NOT-FOUND/stock-adjustments")
+            .with(user("admin-test").roles("ADMIN"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"adjustment\":1}"))
+        .andExpect(request().asyncStarted())
+        .andReturn();
+
+    mockMvc.perform(asyncDispatch(result))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("INGREDIENT_NOT_FOUND"));
+  }
+  //Fin TC-13
 
   @Test
   public void shouldDenyUnlistedRoute() throws Exception {

@@ -15,6 +15,7 @@ import javax.validation.constraints.Size;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -78,6 +79,19 @@ public class ApiExceptionHandlerTest {
             .andExpect(jsonPath("$.code").value(ApiErrorCodes.DUPLICATE_RESOURCE));
     }
 
+    //TC-13 - Traduce conflictos de version al contrato ApiProblem
+    @Test
+    public void shouldReturnOptimisticLockConflictAsProblemJson() throws Exception {
+        mockMvc.perform(get("/test/optimistic-lock"))
+            .andExpect(status().isConflict())
+            .andExpect(content().contentTypeCompatibleWith(ApiExceptionHandler.PROBLEM_JSON))
+            .andExpect(jsonPath("$.status").value(409))
+            .andExpect(jsonPath("$.code").value(ApiErrorCodes.OPTIMISTIC_LOCK_CONFLICT))
+            .andExpect(jsonPath("$.detail").value(
+                "The resource was modified by another operation."));
+    }
+    //Fin TC-13
+
     @Test
     public void shouldReturnBusinessRuleAsUnprocessableEntity() throws Exception {
         mockMvc.perform(get("/test/business"))
@@ -138,6 +152,13 @@ public class ApiExceptionHandlerTest {
             throw new ConflictException(ApiErrorCodes.DUPLICATE_RESOURCE,
                 "Order is in a conflicting state.");
         }
+
+        //TC-13 - Simula la excepcion real entregada por Spring Data
+        @GetMapping("/test/optimistic-lock")
+        public void optimisticLock() {
+            throw new OptimisticLockingFailureException("internal stale version detail");
+        }
+        //Fin TC-13
 
         @GetMapping("/test/business")
         public void business() {
