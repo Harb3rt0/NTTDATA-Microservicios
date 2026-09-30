@@ -1,9 +1,9 @@
 package tacos.kitchen;
 
-import tacos.messaging.KitchenOrderEvent;
+import tacos.messaging.OrderEvent;
 
 public interface OrderReceiver {
 
-  KitchenOrderEvent receiveOrder(); //modificacion para TC-12
+  OrderEvent receiveOrder(); //modificacion para TC-30
 
 }

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
 import tacos.kitchen.KitchenUI;
-import tacos.messaging.KitchenOrderEvent;
+import tacos.messaging.OrderEvent;
 
 @Profile("kafka-listener")
 @Component
@@ -23,8 +23,8 @@ public class OrderListener {
   }
 
   @KafkaListener(topics="tacocloud.orders.topic")
-  public void handle(KitchenOrderEvent order,
-      ConsumerRecord<String, KitchenOrderEvent> record) { //modificacion para TC-12
+  public void handle(OrderEvent order,
+      ConsumerRecord<String, OrderEvent> record) { //modificacion para TC-30
     log.error("Received from partition {} with timestamp {}",
         record.partition(), record.timestamp());
     

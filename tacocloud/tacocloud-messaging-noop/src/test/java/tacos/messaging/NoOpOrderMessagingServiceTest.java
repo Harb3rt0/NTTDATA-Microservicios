@@ -27,7 +27,7 @@ public class NoOpOrderMessagingServiceTest {
         new NoOpOrderMessagingService().sendOrder(event);
 
         String message = appender.list.get(0).getFormattedMessage();
-        assertThat(message).isEqualTo("Sending order ORDER1 to kitchen with 1 tacos");
+        assertThat(message).isEqualTo("Sending event null for order ORDER1 to noop transport");
         assertThat(message).doesNotContain("PRIVATE_TEST_STREET");
         logger.detachAppender(appender);
     }

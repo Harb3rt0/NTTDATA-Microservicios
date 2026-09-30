@@ -3,12 +3,17 @@ package tacos.web.api;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.reactive.TransactionalOperator;
 
 import java.util.UUID;
+import java.util.Date;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.TacoOrder;
+import tacos.OrderStatus;
+import tacos.OrderStatusHistory;
 import tacos.User;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
@@ -25,6 +30,7 @@ import tacos.data.OrderRepository;
 import tacos.data.PaymentMethodRepository;
 import tacos.data.UserRepository;
 import tacos.messaging.OrderMessagingService;
+import tacos.messaging.OrderEventType;
 
 @Service 
 public class OrderService {
@@ -38,14 +44,18 @@ public class OrderService {
     private final CouponService couponService;
     private final TacoDesignService tacoDesignService;
     private final InventoryService inventoryService;
+    private final OrderOutboxService outboxService;
+    private final TransactionalOperator transactionalOperator;
 
     //modificacion para TC-08
     //modificacion para TC-14
+    @Autowired
     public OrderService(OrderRepository repo, OrderMessagingService orderMessages, OrderMapper orderMapper,
             UserRepository userRepo, PaymentMethodRepository paymentMethodRepo,
             KitchenOrderEventMapper kitchenOrderEventMapper, OrderPricingService pricingService,
             CouponService couponService, TacoDesignService tacoDesignService,
-            InventoryService inventoryService) { //modificacion para TC-16
+            InventoryService inventoryService, OrderOutboxService outboxService,
+            TransactionalOperator transactionalOperator) { //modificacion para TC-29
         this.repo = repo;
         this.orderMessages = orderMessages;
         this.orderMapper = orderMapper;
@@ -56,12 +66,22 @@ public class OrderService {
         this.couponService = couponService;
         this.tacoDesignService = tacoDesignService;
         this.inventoryService = inventoryService;
+        this.outboxService = outboxService;
+        this.transactionalOperator = transactionalOperator;
+    }
+
+    public OrderService(OrderRepository repo, OrderMessagingService orderMessages, OrderMapper orderMapper,
+            UserRepository userRepo, PaymentMethodRepository paymentMethodRepo,
+            KitchenOrderEventMapper kitchenOrderEventMapper, OrderPricingService pricingService,
+            CouponService couponService, TacoDesignService tacoDesignService,
+            InventoryService inventoryService) {
+        this(repo, orderMessages, orderMapper, userRepo, paymentMethodRepo, kitchenOrderEventMapper,
+            pricingService, couponService, tacoDesignService, inventoryService, null, null);
     }
 
     //TC-07 - Una sola suscripcion para guarar y publicar
     public Mono<TacoOrder> saveAndPublish(TacoOrder order) {
-        return repo.save(order)
-            .flatMap(this::publish); //modificacion para TC-16
+        return persistWithOutbox(order, OrderEventType.CREATED, UUID.randomUUID().toString());
     }
     //TC-07 - Fin
 
@@ -84,6 +104,10 @@ public class OrderService {
                             coupon.getTotal(), coupon.getCouponCode(), pricingService.getCurrency());
                         order.setUser(user);
                         order.setPaymentMethodId(paymentMethod.getId());
+                        //modificacion para TC-25
+                        order.setStatus(OrderStatus.CREATED);
+                        order.getStatusHistory().add(new OrderStatusHistory(null, OrderStatus.CREATED,
+                            user.getUsername(), new Date(), "API", "Order created"));
                         return order;
                     }))));
     }
@@ -98,22 +122,34 @@ public class OrderService {
         return inventoryService.reserve(reservationKey, order.getItems())
             .flatMap(reservation -> {
                 order.setInventoryReservationKey(reservationKey);
-                return repo.save(order)
-                    .onErrorResume(error -> inventoryService.release(reservationKey)
-                        .then(Mono.error(error)))
+                Mono<TacoOrder> persistence = repo.save(order)
+                    .flatMap(saved -> recordOutbox(saved, OrderEventType.CREATED,
+                        UUID.randomUUID().toString()).thenReturn(saved))
                     .flatMap(saved -> inventoryService.confirm(reservationKey, saved.getId())
-                        .then(publish(saved)));
+                        .thenReturn(saved));
+                return inTransaction(persistence)
+                    .onErrorResume(error -> inventoryService.release(reservationKey)
+                        .then(Mono.error(error)));
             });
     }
     //Fin TC-16
 
-    //TC-16 - Publica solo despues de persistir y conservar la reserva
-    private Mono<TacoOrder> publish(TacoOrder savedOrder) {
-        return Mono.fromRunnable(() -> orderMessages.sendOrder(
-            kitchenOrderEventMapper.toEvent(savedOrder)))
-            .thenReturn(savedOrder);
+    //TC-29 - Persiste orden y outbox en una sola transaccion
+    private Mono<TacoOrder> persistWithOutbox(TacoOrder order, OrderEventType type,
+            String correlationId) {
+        Mono<TacoOrder> persistence = repo.save(order)
+            .flatMap(saved -> recordOutbox(saved, type, correlationId).thenReturn(saved));
+        return inTransaction(persistence);
     }
-    //Fin TC-16
+
+    private Mono<?> recordOutbox(TacoOrder order, OrderEventType type, String correlationId) {
+        return outboxService == null ? Mono.empty() : outboxService.record(order, type, correlationId);
+    }
+
+    private <T> Mono<T> inTransaction(Mono<T> work) {
+        return transactionalOperator == null ? work : transactionalOperator.transactional(work);
+    }
+    //Fin TC-29
 
     //TC-15 - Cotiza sin guardar, publicar ni reservar
     public Mono<OrderQuoteResponse> quoteOrder(OrderQuoteRequest request, Authentication authentication) {

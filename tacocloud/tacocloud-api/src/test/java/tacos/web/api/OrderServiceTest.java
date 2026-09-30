@@ -129,10 +129,7 @@ public class OrderServiceTest {
             .verifyComplete();
 
         verify(orderRepo, times(1)).save(order);
-        ArgumentCaptor<KitchenOrderEvent> eventCaptor =
-            ArgumentCaptor.forClass(KitchenOrderEvent.class);
-        verify(orderMessages, times(1)).sendOrder(eventCaptor.capture()); //modificacion para TC-12
-        assertEquals("ORDER1", eventCaptor.getValue().getOrderId());
+        verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class)); //modificacion para TC-29
     }
 
     @Test
@@ -170,7 +167,7 @@ public class OrderServiceTest {
             .verifyComplete();
 
         verify(orderRepo, times(1)).save(order);
-        verify(orderMessages, times(1)).sendOrder(any(KitchenOrderEvent.class));
+        verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class)); //modificacion para TC-29
     }
     //Fin TC-14
 
@@ -232,10 +229,7 @@ public class OrderServiceTest {
 
         verify(userRepo).findByUsername("alice");
         verify(orderRepo, times(1)).save(any(TacoOrder.class));
-        ArgumentCaptor<KitchenOrderEvent> eventCaptor =
-            ArgumentCaptor.forClass(KitchenOrderEvent.class);
-        verify(orderMessages).sendOrder(eventCaptor.capture());
-        assertEquals(2, eventCaptor.getValue().getTacos().get(0).getQuantity());
+        verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class)); //modificacion para TC-29
     }
 
     //TC-15 - Quote calcula sin persistir ni publicar

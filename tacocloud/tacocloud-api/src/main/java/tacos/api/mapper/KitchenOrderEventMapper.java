@@ -1,48 +1,56 @@
 package tacos.api.mapper;
 
+import java.util.Date;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Component;
 
-import tacos.Ingredient;
 import tacos.OrderLine;
-import tacos.Taco;
 import tacos.TacoOrder;
+import tacos.messaging.OrderEvent;
 import tacos.messaging.KitchenOrderEvent;
-import tacos.messaging.KitchenOrderEvent.KitchenIngredient;
-import tacos.messaging.KitchenOrderEvent.KitchenTaco;
+import tacos.messaging.OrderEventItem;
+import tacos.messaging.OrderEventPayload;
+import tacos.messaging.OrderEventType;
 
-//TC-12 - Mapper de entidad Mongo a evento seguro de cocina
+//TC-27 - Mapper de entidad Mongo al contrato seguro versionado
 @Component
 public class KitchenOrderEventMapper {
 
     public KitchenOrderEvent toEvent(TacoOrder order) {
-        KitchenOrderEvent event = new KitchenOrderEvent();
-        event.setOrderId(order.getId());
-        event.setPlacedAt(order.getPlacedAt());
-        event.setDeliveryName(order.getDeliveryName());
-        event.setDeliveryStreet(order.getDeliveryStreet());
-        event.setDeliveryCity(order.getDeliveryCity());
-        event.setDeliveryState(order.getDeliveryState());
-        event.setDeliveryZip(order.getDeliveryZip());
+        return (KitchenOrderEvent) toEvent(order, OrderEventType.CREATED, UUID.randomUUID().toString());
+    }
 
-        order.getItems().forEach(item -> event.getTacos().add(toTaco(item))); //modificacion para TC-14
+    public OrderEvent toEvent(TacoOrder order, OrderEventType type, String correlationId) {
+        OrderEventPayload payload = new OrderEventPayload();
+        payload.setOrderId(order.getId());
+        payload.setPlacedAt(order.getPlacedAt());
+        payload.setStatus(order.getStatus() == null ? null : order.getStatus().name());
+        payload.setItems(order.getItems().stream().map(this::toItem).collect(Collectors.toList()));
+
+        KitchenOrderEvent event = new KitchenOrderEvent();
+        event.setEventId(UUID.randomUUID().toString());
+        event.setType(type);
+        event.setVersion(1);
+        event.setOccurredAt(new Date());
+        event.setCorrelationId(correlationId);
+        event.setPayload(payload);
+        payload.getItems().forEach(item -> {
+            KitchenOrderEvent.KitchenTaco taco = new KitchenOrderEvent.KitchenTaco();
+            taco.setQuantity(item.getQuantity());
+            event.getTacos().add(taco);
+        });
         return event;
     }
 
-    private KitchenTaco toTaco(OrderLine item) { //modificacion para TC-14
-        Taco taco = item.getTaco();
-        KitchenTaco kitchenTaco = new KitchenTaco();
-        kitchenTaco.setName(taco.getName());
-        kitchenTaco.setQuantity(item.getQuantity());
-        taco.getIngredients().forEach(ingredient ->
-            kitchenTaco.getIngredients().add(toIngredient(ingredient)));
-        return kitchenTaco;
-    }
-
-    private KitchenIngredient toIngredient(Ingredient ingredient) {
-        KitchenIngredient kitchenIngredient = new KitchenIngredient();
-        kitchenIngredient.setName(ingredient.getName());
-        kitchenIngredient.setType(ingredient.getType().name());
-        return kitchenIngredient;
+    private OrderEventItem toItem(OrderLine line) {
+        OrderEventItem item = new OrderEventItem();
+        item.setName(line.getTaco().getName());
+        item.setQuantity(line.getQuantity());
+        item.setIngredients(line.getTaco().getIngredients().stream()
+            .map(ingredient -> ingredient.getName()).collect(Collectors.toList()));
+        return item;
     }
 }
-//Fin TC-12
+//Fin TC-27

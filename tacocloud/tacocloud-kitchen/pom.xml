@@ -23,6 +23,35 @@
 	</properties>
 
 	<dependencies>
+		<!-- TC-30 - Contrato unico e idempotencia durable -->
+		<dependency>
+			<groupId>sia</groupId>
+			<artifactId>tacocloud-messaging-contract</artifactId>
+			<version>${tacocloud.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-mongodb</artifactId>
+		</dependency>
+		<!-- TC-30 - Broker real para la prueba E2E elegida -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>rabbitmq</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<version>${testcontainers.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Fin TC-30 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+		<!-- Fin TC-30 -->
 		<!-- Necessary Boot starters -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

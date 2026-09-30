@@ -118,7 +118,7 @@ public class Tc14OrderPricingIntegrationTest {
     assertEquals(new BigDecimal("7.50"), orderCaptor.getValue().getTotal());
     assertEquals(new BigDecimal("3.75"),
         orderCaptor.getValue().getItems().get(0).getUnitPriceAtPurchase());
-    verify(orderMessages, times(1)).sendOrder(any(KitchenOrderEvent.class));
+    verify(orderMessages, never()).sendOrder(any(KitchenOrderEvent.class)); //modificacion para TC-29
   }
 
   @Test

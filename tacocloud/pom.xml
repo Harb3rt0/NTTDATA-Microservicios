@@ -19,6 +19,7 @@
       <maven.compiler.source>1.8</maven.compiler.source>
       <maven.compiler.target>1.8</maven.compiler.target>
       <tacocloud.version>${project.version}</tacocloud.version>
+      <testcontainers.version>1.17.6</testcontainers.version>
     </properties>
 
     <modules>
@@ -29,6 +30,9 @@
       <module>tacocloud-email</module>
       <module>tacocloud-jmx</module>
       <module>tacocloud-kitchen</module>
+      <!-- TC-27 - Contrato unico de eventos de orden -->
+      <module>tacocloud-messaging-contract</module>
+      <!-- Fin TC-27 -->
       <module>tacocloud-messaging-jms</module>
       <module>tacocloud-messaging-kafka</module>
       <module>tacocloud-messaging-rabbitmq</module>

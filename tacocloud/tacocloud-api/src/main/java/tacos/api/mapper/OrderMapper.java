@@ -13,6 +13,7 @@ import tacos.api.dto.OrderLineResponse;
 import tacos.api.dto.OrderPatchRequest;
 import tacos.api.dto.OrderQuoteResponse;
 import tacos.api.dto.OrderResponse;
+import tacos.api.dto.OrderStatusHistoryResponse;
 import tacos.api.dto.OrderUpdateRequest;
 
 @Component 
@@ -94,6 +95,19 @@ public class OrderMapper {
         response.setTotal(order.getTotal());
         response.setCurrency(order.getCurrency());
         response.setCouponCode(order.getCouponCode());
+        //modificacion para TC-25
+        response.setStatus(order.getStatus());
+        response.setStationId(order.getStationId());
+        response.setStatusHistory(order.getStatusHistory().stream().map(history -> {
+            OrderStatusHistoryResponse item = new OrderStatusHistoryResponse();
+            item.setFrom(history.getFrom());
+            item.setTo(history.getTo());
+            item.setActor(history.getActor());
+            item.setOccurredAt(history.getOccurredAt());
+            item.setOrigin(history.getOrigin());
+            item.setReason(history.getReason());
+            return item;
+        }).collect(Collectors.toList()));
 
         return response;
     }

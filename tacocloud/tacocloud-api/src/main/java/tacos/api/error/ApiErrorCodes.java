@@ -41,6 +41,10 @@ public final class ApiErrorCodes {
     //TC-24 - Conflicto transitorio de idempotencia
     public static final String REORDER_IN_PROGRESS = "REORDER_IN_PROGRESS";
     //Fin TC-24
+    //TC-25 - Conflictos estables del flujo de orden
+    public static final String INVALID_ORDER_STATUS_TRANSITION = "INVALID_ORDER_STATUS_TRANSITION";
+    public static final String ORDER_CANNOT_BE_CANCELLED = "ORDER_CANNOT_BE_CANCELLED";
+    //Fin TC-25
     public static final String EMAIL_ORDER_REQUIRED = "EMAIL_ORDER_REQUIRED";
     public static final String EMAIL_TACOS_REQUIRED = "EMAIL_TACOS_REQUIRED";
     public static final String EMAIL_TACO_INGREDIENTS_REQUIRED = "EMAIL_TACO_INGREDIENTS_REQUIRED";

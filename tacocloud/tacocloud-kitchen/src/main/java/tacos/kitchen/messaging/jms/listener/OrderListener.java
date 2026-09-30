@@ -6,7 +6,7 @@ import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
 
 import tacos.kitchen.KitchenUI;
-import tacos.messaging.KitchenOrderEvent;
+import tacos.messaging.OrderEvent;
 
 @Profile("jms-listener")
 @Component
@@ -20,7 +20,7 @@ public class OrderListener {
   }
 
   @JmsListener(destination = "tacocloud.order.queue")
-  public void receiveOrder(KitchenOrderEvent order) { //modificacion para TC-12
+  public void receiveOrder(OrderEvent order) { //modificacion para TC-30
     ui.displayOrder(order);
   }
   

@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 
 import lombok.Data;
+import tacos.OrderStatus;
 
 @Data 
 public class OrderResponse {
@@ -25,4 +26,9 @@ public class OrderResponse {
     private String currency;
     private String couponCode;
     //Fin TC-14
+    //TC-25 - Estado y auditoria sin exponer la version interna
+    private OrderStatus status;
+    private List<OrderStatusHistoryResponse> statusHistory = new ArrayList<>();
+    private String stationId;
+    //Fin TC-25
 }

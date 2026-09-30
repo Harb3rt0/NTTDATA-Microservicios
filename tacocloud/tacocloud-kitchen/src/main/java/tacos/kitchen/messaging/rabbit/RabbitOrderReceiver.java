@@ -4,7 +4,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import tacos.messaging.KitchenOrderEvent;
+import tacos.messaging.OrderEvent;
 import tacos.kitchen.OrderReceiver;
 
 @Profile("rabbitmq-template")
@@ -17,8 +17,8 @@ public class RabbitOrderReceiver implements OrderReceiver {
     this.rabbit = rabbit;
   }
   
-  public KitchenOrderEvent receiveOrder() { //modificacion para TC-12
-    return (KitchenOrderEvent) rabbit.receiveAndConvert("tacocloud.order.queue");
+  public OrderEvent receiveOrder() { //modificacion para TC-30
+    return (OrderEvent) rabbit.receiveAndConvert("tacocloud.order.queue");
   }
   
 }

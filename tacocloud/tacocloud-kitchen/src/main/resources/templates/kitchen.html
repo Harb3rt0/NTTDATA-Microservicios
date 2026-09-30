@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><title>TacoCloud Kitchen</title></head>
+<body>
+  <!-- TC-26 - UI operacional minima -->
+  <h1>Kitchen queue</h1>
+  <button onclick="loadQueue()">Refresh</button>
+  <button onclick="claimOrder()">Claim next</button>
+  <pre id="queue">Loading...</pre>
+  <script th:inline="javascript">
+    const apiBase = /*[[${apiBase}]]*/ 'http://localhost:8080';
+    async function loadQueue() {
+      const response = await fetch(apiBase + '/api/kitchen/queue', {credentials: 'include'});
+      document.getElementById('queue').textContent = JSON.stringify(await response.json(), null, 2);
+    }
+    async function claimOrder() {
+      await fetch(apiBase + '/api/kitchen/orders/claim', {method: 'POST', credentials: 'include'});
+      await loadQueue();
+    }
+    loadQueue();
+  </script>
+  <!-- Fin TC-26 -->
+</body>
+</html>

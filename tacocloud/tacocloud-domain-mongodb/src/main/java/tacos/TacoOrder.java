@@ -7,6 +7,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -22,6 +23,15 @@ public class TacoOrder implements Serializable {
   @Id
   private String id;
   private Date placedAt = new Date();
+
+  //TC-25 - Estado, auditoria y control optimista
+  private OrderStatus status = OrderStatus.CREATED;
+  private List<OrderStatusHistory> statusHistory = new ArrayList<>();
+  private String stationId;
+
+  @Version
+  private Long version;
+  //Fin TC-25
 
   private User user;
 

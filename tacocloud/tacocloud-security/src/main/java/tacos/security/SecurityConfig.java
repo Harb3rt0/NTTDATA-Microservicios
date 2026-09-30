@@ -66,9 +66,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         .antMatchers(HttpMethod.DELETE, "/api/ingredients/**").hasRole("ADMIN")
         .antMatchers(HttpMethod.POST, "/api/orders/fromEmail").hasRole("ADMIN")
         .antMatchers("/api/admin/**").hasRole("ADMIN") //modificacion para TC-12
+        .antMatchers("/api/kitchen/**").hasRole("KITCHEN") //modificacion para TC-26
         .antMatchers("/api/payment-methods/**").hasAnyRole("USER", "ADMIN") //modificacion para TC-12
         .antMatchers("/api/users/me/favorites/**").hasAnyRole("USER", "ADMIN") //modificacion para TC-21
         .antMatchers("/api/users/me/orders/**").hasAnyRole("USER", "ADMIN") //modificacion para TC-23
+        //TC-25 - Roles del flujo operativo y cancelacion del propietario
+        .antMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasRole("KITCHEN")
+        .antMatchers(HttpMethod.POST, "/api/orders/*/cancel").hasRole("USER")
+        //Fin TC-25
         .antMatchers("/api/orders/**").hasAnyRole("USER", "ADMIN")
         .antMatchers(HttpMethod.POST, "/api/tacos/validate").hasAnyRole("USER", "ADMIN") //modificacion para TC-18
         .antMatchers(HttpMethod.POST, "/api/tacos").hasAnyRole("USER", "ADMIN")
