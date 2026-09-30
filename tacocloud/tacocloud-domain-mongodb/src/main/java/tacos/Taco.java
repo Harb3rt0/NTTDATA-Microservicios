@@ -8,6 +8,8 @@ import javax.validation.constraints.Size;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.rest.core.annotation.RestResource;
 
 import lombok.Data;
@@ -15,6 +17,12 @@ import lombok.Data;
 @Data
 @RestResource(rel = "tacos", path = "tacos")
 @Document
+//TC-19 - Indices para orden estable y busqueda por ingrediente
+@CompoundIndexes({
+  @CompoundIndex(name = "taco_created_id_idx", def = "{'createdAt':-1,'_id':1}"),
+  @CompoundIndex(name = "taco_ingredient_idx", def = "{'ingredients._id':1}")
+})
+//Fin TC-19
 public class Taco {
 
   @Id

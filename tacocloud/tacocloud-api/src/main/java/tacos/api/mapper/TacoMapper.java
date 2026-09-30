@@ -37,6 +37,9 @@ public class TacoMapper {
 
     public TacoResponse toResponse(Taco taco) {
         TacoResponse response = new TacoResponse();
+        //modificacion para TC-19
+        response.setId(taco.getId());
+        response.setCreatedAt(taco.getCreatedAt());
         response.setName(taco.getName());
         response.setIngredients(taco.getIngredients().stream()
             .map(ingredientMapper::toResponse)

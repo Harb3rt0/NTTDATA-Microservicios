@@ -12,6 +12,7 @@ import { LoginComponent } from './login/login.component';
 import { RecentTacosComponent } from './recents/recents.component';
 import { ApiService } from './api/ApiService';
 import { RecentTacosService } from './recents/RecentTacosService';
+import { FavoriteService } from './recents/FavoriteService';
 import { SpecialsComponent } from './specials/specials.component';
 
 import { routes } from './app.routes';
@@ -61,6 +62,7 @@ import { CartService } from './cart/cart-service';
     ApiService,
     CartService,
     RecentTacosService,
+    FavoriteService, //modificacion para TC-21
   ],
   bootstrap: [AppComponent]
 })

@@ -9,6 +9,9 @@ public final class ApiErrorCodes {
     public static final String RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND";
     public static final String INGREDIENT_NOT_FOUND = "INGREDIENT_NOT_FOUND";
     public static final String TACO_NOT_FOUND = "TACO_NOT_FOUND";
+    //TC-20 - Sin candidato valido para recomendacion
+    public static final String TACO_OF_DAY_NOT_FOUND = "TACO_OF_DAY_NOT_FOUND";
+    //Fin TC-20
     public static final String ORDER_NOT_FOUND = "ORDER_NOT_FOUND";
     public static final String INGREDIENT_ID_MISMATCH = "INGREDIENT_ID_MISMATCH";
     //TC-13 - Codigos estables de catalogo e inventario
@@ -35,6 +38,9 @@ public final class ApiErrorCodes {
     //TC-16 - Error estable de reserva de inventario
     public static final String INSUFFICIENT_STOCK = "INSUFFICIENT_STOCK";
     //Fin TC-16
+    //TC-24 - Conflicto transitorio de idempotencia
+    public static final String REORDER_IN_PROGRESS = "REORDER_IN_PROGRESS";
+    //Fin TC-24
     public static final String EMAIL_ORDER_REQUIRED = "EMAIL_ORDER_REQUIRED";
     public static final String EMAIL_TACOS_REQUIRED = "EMAIL_TACOS_REQUIRED";
     public static final String EMAIL_TACO_INGREDIENTS_REQUIRED = "EMAIL_TACO_INGREDIENTS_REQUIRED";

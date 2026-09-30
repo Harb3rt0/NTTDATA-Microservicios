@@ -67,7 +67,13 @@ public class OrderService {
 
     //TC-08 - Separar DTOs de entrada, respuesta y persistencia
     public Mono<TacoOrder> createOrder(OrderCreateRequest request, Authentication authentication) {
-        //modificacion para TC-11
+        //modificacion para TC-24
+        return prepareOrder(request, authentication)
+            .flatMap(order -> reserveAndPersist(order, UUID.randomUUID().toString()));
+    }
+
+    //TC-24 - Prepara y valida sin reservar para comparar una recompra
+    public Mono<TacoOrder> prepareOrder(OrderCreateRequest request, Authentication authentication) {
         return Mono.defer(() -> authenticatedUser(authentication)
             .flatMap(user -> ownedPaymentMethod(request.getPaymentMethodId(), user) //modificacion para TC-12
                 .flatMap(paymentMethod -> priceAndDiscount(request.getItems(), request.getCouponCode())
@@ -79,9 +85,13 @@ public class OrderService {
                         order.setUser(user);
                         order.setPaymentMethodId(paymentMethod.getId());
                         return order;
-                    }))))
-            .flatMap(order -> reserveAndPersist(order, UUID.randomUUID().toString())); //modificacion para TC-16
+                    }))));
     }
+
+    public Mono<TacoOrder> createPreparedOrder(TacoOrder order, String reservationKey) {
+        return reserveAndPersist(order, reservationKey);
+    }
+    //Fin TC-24
 
     //TC-16 - Reserva despues de validar y compensa si falla el guardado
     private Mono<TacoOrder> reserveAndPersist(TacoOrder order, String reservationKey) {

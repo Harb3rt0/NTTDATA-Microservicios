@@ -57,6 +57,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/specials", "/locations").permitAll()
         .antMatchers("/design", "/cart").hasAnyRole("USER", "ADMIN")
         .antMatchers(HttpMethod.GET, "/api/ingredients/**", "/api/tacos/**").permitAll()
+        .antMatchers(HttpMethod.PUT, "/api/tacos/*/rating").hasAnyRole("USER", "ADMIN") //modificacion para TC-22
         .antMatchers(HttpMethod.GET, "/actuator/health").permitAll()
         .antMatchers("/actuator/**", "/data-api/**", "/h2-console/**").hasRole("ADMIN")
         .antMatchers(HttpMethod.POST, "/api/ingredients").hasRole("ADMIN")
@@ -66,6 +67,8 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         .antMatchers(HttpMethod.POST, "/api/orders/fromEmail").hasRole("ADMIN")
         .antMatchers("/api/admin/**").hasRole("ADMIN") //modificacion para TC-12
         .antMatchers("/api/payment-methods/**").hasAnyRole("USER", "ADMIN") //modificacion para TC-12
+        .antMatchers("/api/users/me/favorites/**").hasAnyRole("USER", "ADMIN") //modificacion para TC-21
+        .antMatchers("/api/users/me/orders/**").hasAnyRole("USER", "ADMIN") //modificacion para TC-23
         .antMatchers("/api/orders/**").hasAnyRole("USER", "ADMIN")
         .antMatchers(HttpMethod.POST, "/api/tacos/validate").hasAnyRole("USER", "ADMIN") //modificacion para TC-18
         .antMatchers(HttpMethod.POST, "/api/tacos").hasAnyRole("USER", "ADMIN")

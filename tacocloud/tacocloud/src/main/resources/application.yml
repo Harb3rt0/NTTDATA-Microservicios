@@ -13,11 +13,16 @@ taco:
       abcdef: 10
 
 tacocloud:
+  time-zone: UTC #modificacion para TC-20
   # TC-14 - Politica economica del pedido
   order:
     max-item-quantity: 10
   pricing:
     currency: USD
+  # TC-22 - Umbral de votos para ranking
+  ratings:
+    min-votes: 1
+  # Fin TC-22
   # Fin TC-14
   # TC-15 - Cupones academicos configurados externamente
   coupons:
@@ -72,6 +77,8 @@ spring:
   application:
     name: taco-cloud
   data:
+    mongodb:
+      auto-index-creation: true #modificacion para TC-21
     rest:
       base-path: /data-api
     cassandra:
