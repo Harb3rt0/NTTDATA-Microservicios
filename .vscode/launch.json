@@ -1,5 +1,65 @@
 {
     "configurations": [
+        {//TC-12
+            "type": "java",
+            "name": "Spring Boot-TacoCloudApplication<tacocloud_tc11-tc12>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "tacos.TacoCloudApplication",
+            "projectName": "tacocloud",
+            "args": "--spring.profiles.active=tc11-demo,tc12-migration",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {//TC-13
+            "type": "java",
+            "name": "Spring Boot-TacoCloudApplication<tacocloud_tc13>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "tacos.TacoCloudApplication",
+            "projectName": "tacocloud",
+            "args": "--spring.profiles.active=tc11-demo",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {//TC-14
+            "type": "java",
+            "name": "Spring Boot-TacoCloudApplication<tacocloud_tc14>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "tacos.TacoCloudApplication",
+            "projectName": "tacocloud",
+            "args": "--spring.profiles.active=tc11-demo",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {//TC-25
+            "type": "java",
+            "name": "Spring Boot-TacoCloudApplication<tacocloud_tc25>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "tacos.TacoCloudApplication",
+            "projectName": "tacocloud",
+            "args": "--spring.profiles.active=tc11-demo --spring.data.mongodb.uri=mongodb://localhost:27017/tacocloud?replicaSet=rs0 --tacocloud.messaging.transport=noop --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mongo.embedded.EmbeddedMongoAutoConfiguration",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {//TC-30
+            "type": "java",
+            "name": "TacoCloud Lab5 Rabbit",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "tacos.TacoCloudApplication",
+            "projectName": "tacocloud",
+            "args": "--spring.profiles.active=tc11-demo --spring.data.mongodb.uri=mongodb://localhost:27017/tacocloud?replicaSet=rs0 --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mongo.embedded.EmbeddedMongoAutoConfiguration",
+            "envFile": "${workspaceFolder}/.env"
+        },
+        {//TC-30
+            "type": "java",
+            "name": "TacoCloud Kitchen Rabbit",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "tacos.kitchen.TacoKitchenApplication",
+            "projectName": "tacocloud-kitchen",
+            "args": "--spring.profiles.active=rabbitmq-listener --spring.data.mongodb.uri=mongodb://localhost:27017/tacocloud-kitchen?replicaSet=rs0 --spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.mongo.embedded.EmbeddedMongoAutoConfiguration",
+            "envFile": "${workspaceFolder}/.env"
+        },
         {
             "type": "java",
             "name": "Spring Boot-TacoCloudApplication<tacocloud>",
@@ -19,6 +79,15 @@
             "projectName": "admin-server",
             "args": "",
             "envFile": "${workspaceFolder}/.env"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Lab 5 - TacoCloud + Kitchen",
+            "configurations": [
+                "TacoCloud Lab5 Rabbit",
+                "TacoCloud Kitchen Rabbit"
+            ]
         }
     ]
 }

@@ -1,7 +1,7 @@
 security:
   user:
-    name: buzz
-    password: infinity
+    name: ${TACOCLOUD_BOOT_USER:}
+    password: ${TACOCLOUD_BOOT_PASSWORD:}
 
 taco:
   orders:
@@ -126,10 +126,11 @@ spring:
   boot:
     admin:
       client:
-        url: http://localhost:9090
+        enabled: ${TACOCLOUD_ADMIN_ENABLED:false}
+        url: ${TACOCLOUD_ADMIN_URL:http://localhost:9090}
 # end::springBootAdminUri[]
-        username: admin
-        password: 53cr3t
+        username: ${TACOCLOUD_ADMIN_USERNAME:}
+        password: ${TACOCLOUD_ADMIN_PASSWORD:}
 # end::springBootAdminCreds[]
 
 # The values given here are actually the default values. But they are explicitly
@@ -168,6 +169,8 @@ management:
   health:
     probes:
       enabled: true
+    jms:
+      enabled: ${TACOCLOUD_JMS_HEALTH_ENABLED:false}
     readinessstate:
       enabled: true
     livenessstate:
@@ -191,9 +194,9 @@ spring:
   profiles: prod
 
   datasource:
-    url: jdbc:mysql://localhost/tacocloud
-    username: tacouser
-    password: tacopassword
+    url: ${TACOCLOUD_DATASOURCE_URL:jdbc:mysql://localhost/tacocloud}
+    username: ${TACOCLOUD_DATASOURCE_USERNAME:}
+    password: ${TACOCLOUD_DATASOURCE_PASSWORD:}
 
 logging:
   level:

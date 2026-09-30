@@ -1,0 +1,35 @@
+# Maven and Java build output
+target/
+*.class
+*.jar
+*.log
+*.dump
+replay_pid*
+hs_err_pid*
+
+# Frontend dependencies and output
+node_modules/
+dist/
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# IDE and operating-system files
+.idea/
+.classpath
+.project
+.settings/
+.vscode/*
+!.vscode/launch.json
+.DS_Store
+Thumbs.db
+
+# Temporary office/editor files
+~$*
+*.tmp
+
+# Obsolete root wrapper copies (the supported wrapper is in tacocloud/)
+/mvnw
+/mvnw.cmd

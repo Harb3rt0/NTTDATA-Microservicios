@@ -21,6 +21,9 @@ spring:
     username: ${TACOCLOUD_RABBIT_USERNAME:guest}
     password: ${TACOCLOUD_RABBIT_PASSWORD:guest}
 management:
+  health:
+    jms:
+      enabled: ${TACOCLOUD_JMS_HEALTH_ENABLED:false}
   endpoints:
     web:
       exposure:
