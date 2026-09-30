@@ -90,6 +90,9 @@ tacocloud:
 #logging:
 #  level:
 #    org.springframework.data.rest: debug
+logging:
+  pattern:
+    level: "%5p [corr:%X{correlationId:-none}]"
 
 # tag::springBootAdminCreds[]
 # tag::springBootAdminUri[]
@@ -151,7 +154,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: '*'
+        include: health,info,metrics,prometheus
 #end::exposeAll[]
         exclude: threaddump,heapdump
 #end::excludeSome[]
@@ -160,6 +163,15 @@ management:
     health:
       show-details: when_authorized #modificacion para TC-11
       roles: ROLE_ADMIN
+      probes:
+        enabled: true
+  health:
+    probes:
+      enabled: true
+    readinessstate:
+      enabled: true
+    livenessstate:
+      enabled: true
 #end::healthShowDetails[]
 #tag::infoGitModeFull[]
   info:

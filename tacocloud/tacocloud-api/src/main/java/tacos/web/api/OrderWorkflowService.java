@@ -31,18 +31,21 @@ public class OrderWorkflowService {
   private final InventoryService inventoryService;
   private final OrderOutboxService outboxService;
   private final TransactionalOperator transactionalOperator;
+  private final BusinessMetrics businessMetrics;
 
   @Autowired
   public OrderWorkflowService(OrderRepository orderRepo, InventoryService inventoryService,
-      OrderOutboxService outboxService, TransactionalOperator transactionalOperator) {
+      OrderOutboxService outboxService, TransactionalOperator transactionalOperator,
+      BusinessMetrics businessMetrics) { //modificacion para TC-32
     this.orderRepo = orderRepo;
     this.inventoryService = inventoryService;
     this.outboxService = outboxService;
     this.transactionalOperator = transactionalOperator;
+    this.businessMetrics = businessMetrics;
   }
 
   OrderWorkflowService(OrderRepository orderRepo, InventoryService inventoryService) {
-    this(orderRepo, inventoryService, null, null);
+    this(orderRepo, inventoryService, null, null, null);
   }
 
   public Mono<TacoOrder> transition(String orderId, OrderStatus target, String reason,
@@ -69,7 +72,12 @@ public class OrderWorkflowService {
           return applyTransition(order, OrderStatus.CANCELLED, authentication.getName(),
               "CUSTOMER", "Cancelled by customer")
               .flatMap(saved -> inventoryService.release(saved.getInventoryReservationKey())
-                  .thenReturn(saved));
+                  .thenReturn(saved))
+              .doOnSuccess(saved -> {
+                if (businessMetrics != null) {
+                  businessMetrics.orderCancelled();
+                }
+              }); //modificacion para TC-32
         });
   }
 

@@ -6,12 +6,14 @@ import com.rabbitmq.client.Channel;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.slf4j.MDC;
 
 import tacos.kitchen.KitchenEventProcessor;
 import tacos.kitchen.KitchenUI;
@@ -34,6 +36,7 @@ public class OrderListener {
   private final Counter duplicates;
   private final Counter failed;
   private final Counter deadLetters;
+  private final Timer processingLatency;
 
   public OrderListener(KitchenEventProcessor processor, KitchenUI ui, RabbitTemplate rabbitTemplate,
       MeterRegistry registry,
@@ -49,12 +52,15 @@ public class OrderListener {
     this.duplicates = registry.counter("tacocloud.kitchen.events.duplicates");
     this.failed = registry.counter("tacocloud.kitchen.events.failed");
     this.deadLetters = registry.counter("tacocloud.kitchen.events.deadlettered");
+    this.processingLatency = registry.timer("tacocloud.kitchen.processing"); //modificacion para TC-32
   }
 
   @RabbitListener(queues = "${tacocloud.messaging.destination:tacocloud.order.queue}")
   public void receiveOrder(OrderEvent event, Message message, Channel channel) throws IOException {
     long deliveryTag = message.getMessageProperties().getDeliveryTag();
-    try {
+    Timer.Sample sample = Timer.start(); //modificacion para TC-32
+    //modificacion para TC-31
+    try (MDC.MDCCloseable ignored = MDC.putCloseable("correlationId", event.getCorrelationId())) {
       if (processor.process(event)) {
         processed.increment();
         ui.displayOrder(event);
@@ -79,6 +85,8 @@ public class OrderListener {
         });
       }
       channel.basicAck(deliveryTag, false);
+    } finally {
+      sample.stop(processingLatency); //modificacion para TC-32
     }
   }
 

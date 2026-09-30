@@ -5,6 +5,7 @@ import java.util.Date;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
@@ -31,12 +32,15 @@ public class OutboxPublisher {
   private final int maxAttempts;
   private final Duration retryDelay;
   private final Duration staleAfter;
+  private final BusinessMetrics businessMetrics;
 
+  @Autowired
   public OutboxPublisher(ReactiveMongoTemplate mongoTemplate, OrderMessagingService messagingService,
       ObjectMapper objectMapper, @Value("${tacocloud.outbox.batch-size:20}") int batchSize,
       @Value("${tacocloud.outbox.max-attempts:5}") int maxAttempts,
       @Value("${tacocloud.outbox.retry-delay:PT5S}") Duration retryDelay,
-      @Value("${tacocloud.outbox.stale-after:PT1M}") Duration staleAfter) {
+      @Value("${tacocloud.outbox.stale-after:PT1M}") Duration staleAfter,
+      BusinessMetrics businessMetrics) {
     this.mongoTemplate = mongoTemplate;
     this.messagingService = messagingService;
     this.objectMapper = objectMapper;
@@ -44,11 +48,26 @@ public class OutboxPublisher {
     this.maxAttempts = maxAttempts;
     this.retryDelay = retryDelay;
     this.staleAfter = staleAfter;
+    this.businessMetrics = businessMetrics;
+  }
+
+  OutboxPublisher(ReactiveMongoTemplate mongoTemplate, OrderMessagingService messagingService,
+      ObjectMapper objectMapper, int batchSize, int maxAttempts, Duration retryDelay,
+      Duration staleAfter) {
+    this(mongoTemplate, messagingService, objectMapper, batchSize, maxAttempts, retryDelay,
+        staleAfter, null);
   }
 
   public Flux<OutboxEvent> publishBatch() {
-    return Flux.range(0, batchSize).concatMap(index -> claimOne())
-        .concatMap(this::publishClaimed);
+    Query pending = Query.query(Criteria.where("status").in(OutboxStatus.NEW, OutboxStatus.PUBLISHING));
+    return mongoTemplate.count(pending, OutboxEvent.class)
+        .doOnNext(value -> {
+          if (businessMetrics != null) {
+            businessMetrics.updateOutboxBacklog(value);
+          }
+        })
+        .thenMany(Flux.range(0, batchSize).concatMap(index -> claimOne())
+            .concatMap(this::publishClaimed));
   }
 
   Mono<OutboxEvent> claimOne() {

@@ -34,6 +34,7 @@ public class Tc30RabbitContractE2eTest {
     payload.setStatus("CREATED");
     OrderEvent event = new OrderEvent();
     event.setEventId("E-E2E");
+    event.setCorrelationId("CORR-E2E-31"); //modificacion para TC-31
     event.setType(OrderEventType.CREATED);
     event.setVersion(1);
     event.setPayload(payload);
@@ -45,6 +46,7 @@ public class Tc30RabbitContractE2eTest {
       OrderEvent decoded = mapper.readValue(
           new String(received.getBody(), StandardCharsets.UTF_8), OrderEvent.class);
       assertThat(decoded.getEventId()).isEqualTo("E-E2E");
+      assertThat(decoded.getCorrelationId()).isEqualTo("CORR-E2E-31"); //modificacion para TC-31
       assertThat(decoded.getPayload().getOrderId()).isEqualTo("O-E2E");
     }
   }

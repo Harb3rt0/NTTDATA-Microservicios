@@ -16,12 +16,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import tacos.TacoOrder;
+import tacos.api.CorrelationIds;
 import tacos.api.dto.OrderCreateRequest;
 import tacos.api.dto.OrderPatchRequest;
 import tacos.api.dto.OrderQuoteRequest;
@@ -42,6 +46,8 @@ public class OrderApiController {
   private OrderMessagingService orderMessages;
   private EmailOrderService emailOrderService;
   private OrderService orderService;
+  @Autowired(required = false)
+  private IdempotentOrderService idempotentOrderService;
 
   public OrderApiController(OrderRepository repo,
       OrderMessagingService orderMessages,
@@ -64,9 +70,17 @@ public class OrderApiController {
   @PostMapping(consumes = "application/json")
   @ResponseStatus(HttpStatus.CREATED)
   public Mono<OrderResponse> postOrder(@Valid @RequestBody OrderCreateRequest request,
-      Authentication authentication) {
+      Authentication authentication,
+      @RequestAttribute(name = CorrelationIds.ATTRIBUTE, required = false) String correlationId,
+      @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
     //modificacion para TC-11
-    return orderService.createOrder(request, authentication)
+    //modificacion para TC-31
+    String resolvedCorrelationId = CorrelationIds.resolve(correlationId);
+    Mono<TacoOrder> creation = idempotencyKey == null || idempotentOrderService == null
+        ? orderService.createOrder(request, authentication, resolvedCorrelationId)
+        : idempotentOrderService.create(idempotencyKey, request, authentication,
+            resolvedCorrelationId);
+    return creation
       .map(orderMapper::toResponse);
   }
   //TC-08 - Fin

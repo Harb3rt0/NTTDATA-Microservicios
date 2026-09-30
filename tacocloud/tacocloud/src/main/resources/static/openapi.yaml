@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: TacoCloud API
+  version: 1.0.0
+  description: Public v1 contract. Equivalent /api routes are legacy aliases and return Deprecation and Link headers.
+servers:
+  - url: http://localhost:8080/api/v1
+security:
+  - basicAuth: []
+tags:
+  - {name: Ingredients}
+  - {name: Tacos}
+  - {name: Orders}
+  - {name: Favorites}
+  - {name: History}
+  - {name: Kitchen}
+  - {name: Operations}
+components:
+  securitySchemes:
+    basicAuth: {type: http, scheme: basic}
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: {type: string, maxLength: 64, pattern: '^[A-Za-z0-9._:-]+$'}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: {type: string, minLength: 8, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$'}
+    Page: {name: page, in: query, schema: {type: integer, minimum: 0, default: 0}}
+    Size: {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+  responses:
+    BadRequest: {description: Invalid request, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ApiProblem'}}}}
+    Forbidden: {description: Access denied, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ApiProblem'}}}}
+    NotFound: {description: Resource not found, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ApiProblem'}}}}
+    Conflict: {description: Conflict, content: {application/problem+json: {schema: {$ref: '#/components/schemas/ApiProblem'}}}}
+  schemas:
+    ApiViolation:
+      type: object
+      properties: {field: {type: string}, message: {type: string}}
+    ApiProblem:
+      type: object
+      required: [type, title, status, detail, code, violations]
+      properties:
+        type: {type: string, format: uri}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+        instance: {type: string}
+        code: {type: string, example: IDEMPOTENCY_KEY_REUSED}
+        violations: {type: array, items: {$ref: '#/components/schemas/ApiViolation'}}
+    IngredientRequest:
+      type: object
+      required: [id, name, type, unitPrice]
+      properties:
+        id: {type: string, maxLength: 8, example: FLTO}
+        name: {type: string, maxLength: 80, example: Flour Tortilla}
+        type: {type: string, enum: [WRAP, PROTEIN, VEGGIES, CHEESE, SAUCE]}
+        unitPrice: {type: number, minimum: 0, example: 1.25}
+        available: {type: boolean}
+        stockOnHand: {type: integer, minimum: 0}
+        reorderLevel: {type: integer, minimum: 0}
+    IngredientResponse:
+      allOf: [{$ref: '#/components/schemas/IngredientRequest'}]
+    TacoRequest:
+      type: object
+      required: [name, ingredientIds]
+      properties:
+        name: {type: string, maxLength: 50, example: Veggie Supreme}
+        ingredientIds: {type: array, minItems: 2, uniqueItems: true, items: {type: string}}
+    TacoResponse:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        createdAt: {type: string, format: date-time}
+        ingredients: {type: array, items: {$ref: '#/components/schemas/IngredientResponse'}}
+    OrderLineRequest:
+      type: object
+      required: [taco, quantity]
+      properties:
+        taco: {$ref: '#/components/schemas/TacoRequest'}
+        quantity: {type: integer, minimum: 1, maximum: 10}
+    OrderCreateRequest:
+      type: object
+      required: [deliveryName, deliveryStreet, deliveryCity, deliveryState, deliveryZip, paymentMethodId, items]
+      properties:
+        deliveryName: {type: string, maxLength: 80}
+        deliveryStreet: {type: string, maxLength: 120}
+        deliveryCity: {type: string, maxLength: 80}
+        deliveryState: {type: string, maxLength: 50}
+        deliveryZip: {type: string, minLength: 3, maxLength: 12}
+        paymentMethodId: {type: string, maxLength: 64, description: Tokenized payment method identifier}
+        couponCode: {type: string, maxLength: 40}
+        items: {type: array, minItems: 1, maxItems: 20, items: {$ref: '#/components/schemas/OrderLineRequest'}}
+    OrderResponse:
+      type: object
+      description: Safe public representation without authentication, raw payment or internal User data.
+      properties:
+        id: {type: string}
+        placedAt: {type: string, format: date-time}
+        deliveryName: {type: string}
+        deliveryStreet: {type: string}
+        deliveryCity: {type: string}
+        deliveryState: {type: string}
+        deliveryZip: {type: string}
+        status: {type: string, enum: [CREATED, ACCEPTED, PREPARING, READY, OUT_FOR_DELIVERY, DELIVERED, CANCELLED]}
+        subtotalBeforeDiscount: {type: number}
+        discountAmount: {type: number}
+        total: {type: number}
+        currency: {type: string, example: USD}
+        items: {type: array, items: {type: object}}
+    AnnouncementRequest:
+      type: object
+      required: [text, severity, expiresAt]
+      properties:
+        text: {type: string, minLength: 1, maxLength: 500}
+        severity: {type: string, enum: [INFO, WARNING, CRITICAL]}
+        expiresAt: {type: string, format: date-time}
+    AnnouncementResponse:
+      type: object
+      properties:
+        id: {type: string}
+        text: {type: string}
+        severity: {type: string}
+        createdAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+paths:
+  /ingredients:
+    get:
+      tags: [Ingredients]
+      summary: List ingredients
+      security: []
+      parameters: [{$ref: '#/components/parameters/CorrelationId'}]
+      responses: {'200': {description: Ingredient list, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/IngredientResponse'}}}}}}
+    post:
+      tags: [Ingredients]
+      summary: Create ingredient (ADMIN)
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IngredientRequest'}}}}
+      responses: {'201': {description: Created}, '400': {$ref: '#/components/responses/BadRequest'}, '403': {$ref: '#/components/responses/Forbidden'}}
+  /ingredients/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+    get: {tags: [Ingredients], summary: Get ingredient, security: [], responses: {'200': {description: Ingredient, content: {application/json: {schema: {$ref: '#/components/schemas/IngredientResponse'}}}}, '404': {$ref: '#/components/responses/NotFound'}}}
+    put: {tags: [Ingredients], summary: Replace ingredient (ADMIN), requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/IngredientRequest'}}}}, responses: {'200': {description: Updated}, '403': {$ref: '#/components/responses/Forbidden'}}}
+    delete: {tags: [Ingredients], summary: Delete ingredient (ADMIN), responses: {'204': {description: Deleted}, '404': {$ref: '#/components/responses/NotFound'}}}
+  /tacos:
+    get:
+      tags: [Tacos]
+      summary: List tacos with pagination
+      security: []
+      parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'}]
+      responses: {'200': {description: Taco page}}
+    post:
+      tags: [Tacos]
+      summary: Create taco
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/TacoRequest'}}}}
+      responses: {'201': {description: Created, content: {application/json: {schema: {$ref: '#/components/schemas/TacoResponse'}}}}, '400': {$ref: '#/components/responses/BadRequest'}}
+  /tacos/{id}:
+    get: {tags: [Tacos], summary: Get taco, security: [], parameters: [{name: id, in: path, required: true, schema: {type: string}}], responses: {'200': {description: Taco}, '404': {$ref: '#/components/responses/NotFound'}}}
+  /tacos/{id}/rating:
+    put:
+      tags: [Tacos]
+      summary: Rate taco
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      requestBody: {required: true, content: {application/json: {schema: {type: object, required: [score], properties: {score: {type: integer, minimum: 1, maximum: 5}}}}}}
+      responses: {'200': {description: Rating stored}, '400': {$ref: '#/components/responses/BadRequest'}}
+  /tacos/top:
+    get: {tags: [Tacos], summary: Ranked tacos, security: [], responses: {'200': {description: Ranking}}}
+  /orders:
+    get: {tags: [Orders], summary: List own orders or all for ADMIN, responses: {'200': {description: Orders}}}
+    post:
+      tags: [Orders]
+      summary: Create an idempotent order
+      parameters: [{$ref: '#/components/parameters/CorrelationId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/OrderCreateRequest'}}}}
+      responses:
+        '201': {description: Created or replayed, headers: {X-Correlation-Id: {schema: {type: string}}}, content: {application/json: {schema: {$ref: '#/components/schemas/OrderResponse'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /orders/{orderId}:
+    parameters: [{name: orderId, in: path, required: true, schema: {type: string}}]
+    put: {tags: [Orders], summary: Replace owned order, responses: {'200': {description: Updated}, '404': {$ref: '#/components/responses/NotFound'}}}
+    patch: {tags: [Orders], summary: Patch delivery fields, responses: {'200': {description: Updated}, '404': {$ref: '#/components/responses/NotFound'}}}
+    delete: {tags: [Orders], summary: Delete owned order, responses: {'204': {description: Deleted}, '404': {$ref: '#/components/responses/NotFound'}}}
+  /orders/{orderId}/cancel:
+    post: {tags: [Orders], summary: Cancel owned order, parameters: [{name: orderId, in: path, required: true, schema: {type: string}}], responses: {'200': {description: Cancelled}, '409': {$ref: '#/components/responses/Conflict'}}}
+  /users/me/favorites:
+    get: {tags: [Favorites], summary: List own favorites, responses: {'200': {description: Favorites}}}
+  /users/me/favorites/{tacoId}:
+    parameters: [{name: tacoId, in: path, required: true, schema: {type: string}}]
+    put: {tags: [Favorites], summary: Add favorite, responses: {'200': {description: Stored}}}
+    delete: {tags: [Favorites], summary: Remove favorite, responses: {'204': {description: Removed}}}
+  /users/me/orders:
+    get: {tags: [History], summary: Paginated order history, parameters: [{$ref: '#/components/parameters/Page'}, {$ref: '#/components/parameters/Size'}], responses: {'200': {description: History}}}
+  /users/me/orders/{orderId}:
+    get: {tags: [History], summary: Get own historical order, parameters: [{name: orderId, in: path, required: true, schema: {type: string}}], responses: {'200': {description: Order}, '404': {$ref: '#/components/responses/NotFound'}}}
+  /kitchen/queue:
+    get: {tags: [Kitchen], summary: FIFO kitchen queue (KITCHEN), responses: {'200': {description: Queue}, '403': {$ref: '#/components/responses/Forbidden'}}}
+  /kitchen/orders/claim:
+    post: {tags: [Kitchen], summary: Atomically claim next order (KITCHEN), responses: {'200': {description: Claimed order}, '204': {description: Queue empty}}}
+  /admin/announcements:
+    get: {tags: [Operations], summary: List active announcements (ADMIN), responses: {'200': {description: Active announcements}, '403': {$ref: '#/components/responses/Forbidden'}}}
+    post: {tags: [Operations], summary: Create announcement (ADMIN), requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/AnnouncementRequest'}}}}, responses: {'201': {description: Created}, '400': {$ref: '#/components/responses/BadRequest'}, '409': {$ref: '#/components/responses/Conflict'}}}
+  /admin/announcements/{id}:
+    delete: {tags: [Operations], summary: Delete announcement (ADMIN), parameters: [{name: id, in: path, required: true, schema: {type: string}}], responses: {'204': {description: Deleted}, '404': {$ref: '#/components/responses/NotFound'}}}

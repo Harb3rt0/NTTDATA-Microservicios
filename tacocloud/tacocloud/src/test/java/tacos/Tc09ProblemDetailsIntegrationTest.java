@@ -17,7 +17,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = {"spring.boot.admin.client.enabled=false",
-    "management.info.git.enabled=false", "management.info.build.enabled=false"})
+    "management.info.git.enabled=false", "management.info.build.enabled=false",
+    "tacocloud.messaging.transport=rabbit"}) //modificacion para TC-36
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
 public class Tc09ProblemDetailsIntegrationTest {

@@ -83,6 +83,7 @@ public class OutboxPublisherTest {
   }
 
   private void stub(ReactiveMongoTemplate template, OutboxEvent claimed, OutboxEvent result) {
+    when(template.count(any(Query.class), eq(OutboxEvent.class))).thenReturn(Mono.just(1L)); //modificacion para TC-32
     when(template.findAndModify(any(Query.class), any(Update.class),
         any(FindAndModifyOptions.class), eq(OutboxEvent.class)))
         .thenReturn(Mono.just(claimed), Mono.just(result), Mono.empty());

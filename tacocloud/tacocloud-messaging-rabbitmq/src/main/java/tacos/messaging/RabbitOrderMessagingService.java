@@ -33,6 +33,7 @@ public class RabbitOrderMessagingService
               throws AmqpException {
             MessageProperties props = message.getMessageProperties();
             props.setHeader("X_ORDER_SOURCE", "WEB");
+            props.setHeader("x-correlation-id", order.getCorrelationId()); //modificacion para TC-31
             return message;
           } 
         });

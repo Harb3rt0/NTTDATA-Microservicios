@@ -43,7 +43,8 @@ import tacos.data.UserRepository;
 
 @SpringBootTest(properties = {
     "spring.boot.admin.client.enabled=false",
-    "tacocloud.security.allowed-origin=http://localhost:4200"
+    "tacocloud.security.allowed-origin=http://localhost:4200",
+    "tacocloud.messaging.transport=rabbit" //modificacion para TC-36: prod exige transporte real desde TC-28
 })
 @AutoConfigureMockMvc
 @ActiveProfiles({"prod", "tc12-migration"}) //modificacion para TC-12
@@ -89,6 +90,24 @@ public class Tc11AuthorizationIntegrationTest {
         .andExpect(jsonPath("$[0].reorderLevel").doesNotExist())
         .andExpect(jsonPath("$[0].version").doesNotExist()); //modificacion para TC-13
   }
+
+  //TC-31/TC-32/TC-33/TC-35 - borde versionado, correlacion y seguridad operativa
+  @Test
+  public void shouldExposeVersionedPublicCatalogWithCorrelationHeader() throws Exception {
+    when(ingredientRepo.findAll()).thenReturn(Flux.empty());
+    mockMvc.perform(get("/api/v1/ingredients").header("X-Correlation-Id", "contract-31"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("X-Correlation-Id", "contract-31"));
+  }
+
+  @Test
+  public void shouldProtectMetricsAndAnnouncementsFromRegularUsers() throws Exception {
+    mockMvc.perform(get("/actuator/metrics").with(user("alice").roles("USER")))
+        .andExpect(status().isForbidden());
+    mockMvc.perform(get("/api/v1/admin/announcements").with(user("alice").roles("USER")))
+        .andExpect(status().isForbidden());
+  }
+  //Fin TC-31/TC-32/TC-33/TC-35
 
   @Test
   public void shouldRejectAnonymousOrderCreationWithApiProblem() throws Exception {
@@ -328,7 +347,9 @@ public class Tc11AuthorizationIntegrationTest {
 
   @Test
   public void shouldExposeOnlyHealthPubliclyAndProtectOtherActuatorEndpoints() throws Exception {
-    mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
+    int healthStatus = mockMvc.perform(get("/actuator/health"))
+        .andReturn().getResponse().getStatus();
+    assertThat(healthStatus).isIn(200, 503); //modificacion para TC-32: DOWN es publico pero responde 503
 
     mockMvc.perform(get("/actuator/info"))
         .andExpect(status().isUnauthorized())

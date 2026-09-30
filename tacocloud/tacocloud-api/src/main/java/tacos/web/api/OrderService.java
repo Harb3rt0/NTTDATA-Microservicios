@@ -21,6 +21,7 @@ import tacos.api.dto.OrderQuoteRequest;
 import tacos.api.dto.OrderQuoteResponse;
 import tacos.api.dto.OrderUpdateRequest;
 import tacos.api.error.ApiErrorCodes;
+import tacos.api.error.ApiException;
 import tacos.api.error.ResourceNotFoundException;
 import tacos.api.mapper.KitchenOrderEventMapper;
 import tacos.api.mapper.OrderMapper;
@@ -46,6 +47,7 @@ public class OrderService {
     private final InventoryService inventoryService;
     private final OrderOutboxService outboxService;
     private final TransactionalOperator transactionalOperator;
+    private final BusinessMetrics businessMetrics;
 
     //modificacion para TC-08
     //modificacion para TC-14
@@ -55,7 +57,7 @@ public class OrderService {
             KitchenOrderEventMapper kitchenOrderEventMapper, OrderPricingService pricingService,
             CouponService couponService, TacoDesignService tacoDesignService,
             InventoryService inventoryService, OrderOutboxService outboxService,
-            TransactionalOperator transactionalOperator) { //modificacion para TC-29
+            TransactionalOperator transactionalOperator, BusinessMetrics businessMetrics) { //modificacion para TC-32
         this.repo = repo;
         this.orderMessages = orderMessages;
         this.orderMapper = orderMapper;
@@ -68,6 +70,7 @@ public class OrderService {
         this.inventoryService = inventoryService;
         this.outboxService = outboxService;
         this.transactionalOperator = transactionalOperator;
+        this.businessMetrics = businessMetrics;
     }
 
     public OrderService(OrderRepository repo, OrderMessagingService orderMessages, OrderMapper orderMapper,
@@ -76,7 +79,7 @@ public class OrderService {
             CouponService couponService, TacoDesignService tacoDesignService,
             InventoryService inventoryService) {
         this(repo, orderMessages, orderMapper, userRepo, paymentMethodRepo, kitchenOrderEventMapper,
-            pricingService, couponService, tacoDesignService, inventoryService, null, null);
+            pricingService, couponService, tacoDesignService, inventoryService, null, null, null);
     }
 
     //TC-07 - Una sola suscripcion para guarar y publicar
@@ -87,10 +90,30 @@ public class OrderService {
 
     //TC-08 - Separar DTOs de entrada, respuesta y persistencia
     public Mono<TacoOrder> createOrder(OrderCreateRequest request, Authentication authentication) {
-        //modificacion para TC-24
-        return prepareOrder(request, authentication)
-            .flatMap(order -> reserveAndPersist(order, UUID.randomUUID().toString()));
+        return createOrder(request, authentication, UUID.randomUUID().toString());
     }
+
+    //TC-31 - conserva el correlation id HTTP hasta el outbox
+    public Mono<TacoOrder> createOrder(OrderCreateRequest request, Authentication authentication,
+            String correlationId) {
+        //modificacion para TC-24
+        Mono<TacoOrder> placement = prepareOrder(request, authentication)
+            .flatMap(order -> reserveAndPersist(order, UUID.randomUUID().toString(), correlationId))
+            .doOnSuccess(order -> {
+                if (businessMetrics != null && request.getCouponCode() != null
+                        && !request.getCouponCode().trim().isEmpty()) {
+                    businessMetrics.couponApplied();
+                }
+            })
+            .doOnError(error -> {
+                if (businessMetrics != null && error instanceof ApiException
+                        && ApiErrorCodes.INSUFFICIENT_STOCK.equals(((ApiException) error).getCode())) {
+                    businessMetrics.stockRejected();
+                }
+            }); //modificacion para TC-32
+        return businessMetrics == null ? placement : businessMetrics.timePlacement(placement);
+    }
+    //Fin TC-31
 
     //TC-24 - Prepara y valida sin reservar para comparar una recompra
     public Mono<TacoOrder> prepareOrder(OrderCreateRequest request, Authentication authentication) {
@@ -113,18 +136,19 @@ public class OrderService {
     }
 
     public Mono<TacoOrder> createPreparedOrder(TacoOrder order, String reservationKey) {
-        return reserveAndPersist(order, reservationKey);
+        return reserveAndPersist(order, reservationKey, UUID.randomUUID().toString());
     }
     //Fin TC-24
 
     //TC-16 - Reserva despues de validar y compensa si falla el guardado
-    private Mono<TacoOrder> reserveAndPersist(TacoOrder order, String reservationKey) {
+    private Mono<TacoOrder> reserveAndPersist(TacoOrder order, String reservationKey,
+            String correlationId) { //modificacion para TC-31
         return inventoryService.reserve(reservationKey, order.getItems())
             .flatMap(reservation -> {
                 order.setInventoryReservationKey(reservationKey);
                 Mono<TacoOrder> persistence = repo.save(order)
                     .flatMap(saved -> recordOutbox(saved, OrderEventType.CREATED,
-                        UUID.randomUUID().toString()).thenReturn(saved))
+                        correlationId).thenReturn(saved))
                     .flatMap(saved -> inventoryService.confirm(reservationKey, saved.getId())
                         .thenReturn(saved));
                 return inTransaction(persistence)

@@ -97,6 +97,19 @@ public class RabbitOrderListenerTest {
     verify(fixture.ui, times(1)).displayOrder(fixture.event);
   }
 
+  //TC-32 - Métricas del consumidor Kitchen
+  @Test
+  public void shouldRecordProcessedEventAndLatency() throws Exception {
+    Fixture fixture = fixture(3);
+    when(fixture.processor.process(fixture.event)).thenReturn(true);
+
+    fixture.listener.receiveOrder(fixture.event, message(0), fixture.channel);
+
+    assertThat(fixture.registry.counter("tacocloud.kitchen.events.processed").count()).isEqualTo(1.0);
+    assertThat(fixture.registry.timer("tacocloud.kitchen.processing").count()).isEqualTo(1L);
+  }
+  //Fin TC-32
+
   private Fixture fixture(int maxAttempts) {
     Fixture fixture = new Fixture();
     fixture.processor = mock(KitchenEventProcessor.class);
@@ -104,8 +117,9 @@ public class RabbitOrderListenerTest {
     fixture.rabbit = mock(RabbitTemplate.class);
     fixture.channel = mock(Channel.class);
     fixture.event = event();
+    fixture.registry = new SimpleMeterRegistry();
     fixture.listener = new OrderListener(fixture.processor, fixture.ui, fixture.rabbit,
-        new SimpleMeterRegistry(), "orders", maxAttempts);
+        fixture.registry, "orders", maxAttempts);
     return fixture;
   }
 
@@ -136,6 +150,7 @@ public class RabbitOrderListenerTest {
     private Channel channel;
     private OrderEvent event;
     private OrderListener listener;
+    private SimpleMeterRegistry registry;
   }
 }
 //Fin TC-30

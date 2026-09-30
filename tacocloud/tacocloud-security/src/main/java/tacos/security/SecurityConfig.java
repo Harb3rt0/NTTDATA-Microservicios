@@ -52,11 +52,13 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         //modificacion para TC-11
         .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
         .antMatchers("/", "/index.html", "/login", "/register", "/error",
-            "/favicon.ico", "/*.js", "/*.css", "/**/*.js", "/**/*.css",
+            "/favicon.ico", "/openapi.yaml", "/*.js", "/*.css", "/**/*.js", "/**/*.css",
             "/assets/**", "/images/**", "/webjars/**", "/home", "/recents",
             "/specials", "/locations").permitAll()
         .antMatchers("/design", "/cart").hasAnyRole("USER", "ADMIN")
         .antMatchers(HttpMethod.GET, "/api/ingredients/**", "/api/tacos/**").permitAll()
+        .antMatchers(HttpMethod.GET, "/api/v1/ingredients/**", "/api/v1/tacos/**").permitAll() //modificacion para TC-35
+        .antMatchers("/api/v1/**").authenticated() //modificacion para TC-35
         .antMatchers(HttpMethod.PUT, "/api/tacos/*/rating").hasAnyRole("USER", "ADMIN") //modificacion para TC-22
         .antMatchers(HttpMethod.GET, "/actuator/health").permitAll()
         .antMatchers("/actuator/**", "/data-api/**", "/h2-console/**").hasRole("ADMIN")
@@ -124,8 +126,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     CorsConfiguration configuration = new CorsConfiguration();
     configuration.setAllowedOrigins(Collections.singletonList(allowedOrigin));
     configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
-    configuration.setExposedHeaders(Collections.singletonList("Location"));
+    configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type",
+        "X-Correlation-Id", "Idempotency-Key")); //modificacion para TC-31 y TC-34
+    configuration.setExposedHeaders(Arrays.asList("Location", "X-Correlation-Id"));
     configuration.setAllowCredentials(true);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

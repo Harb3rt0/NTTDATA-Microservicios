@@ -31,6 +31,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.reactive.TransactionalOperator;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -45,7 +46,8 @@ import tacos.messaging.OrderMessagingService;
 @SpringBootTest(properties = {
     "spring.boot.admin.client.enabled=false",
     "management.info.git.enabled=false",
-    "management.info.build.enabled=false"
+    "management.info.build.enabled=false",
+    "tacocloud.messaging.transport=rabbit" //modificacion para TC-36
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
@@ -72,9 +74,15 @@ public class Tc14OrderPricingIntegrationTest {
   @MockBean
   private tacos.web.api.InventoryService inventoryService;
 
+  @MockBean
+  private TransactionalOperator transactionalOperator; //modificacion para TC-36
+
   @BeforeEach
   public void setUp() {
-    reset(ingredientRepo, userRepo, orderRepo, paymentMethodRepo, orderMessages, inventoryService);
+    reset(ingredientRepo, userRepo, orderRepo, paymentMethodRepo, orderMessages, inventoryService,
+        transactionalOperator);
+    when(transactionalOperator.transactional(any(Mono.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0)); //modificacion para TC-36
   }
 
   @Test

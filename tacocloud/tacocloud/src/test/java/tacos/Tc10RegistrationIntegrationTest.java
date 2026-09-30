@@ -32,7 +32,8 @@ import reactor.core.publisher.Mono;
 import tacos.data.UserRepository;
 import tacos.security.RegistrationErrorCodes;
 
-@SpringBootTest(properties = "spring.boot.admin.client.enabled=false")
+@SpringBootTest(properties = {"spring.boot.admin.client.enabled=false",
+    "tacocloud.messaging.transport=rabbit"}) //modificacion para TC-36
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
 public class Tc10RegistrationIntegrationTest {
